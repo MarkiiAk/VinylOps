@@ -1,0 +1,215 @@
+// VinylOps Pricing Studio — Prisma schema
+// Datasource: SQLite (app privada, single-tenant, sin necesidad de servidor de DB)
+// Generator: prisma-client (ESM client, ver ARCHITECTURE.md para el porqué de esta eleccion sobre prisma-client-js)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Material {
+  id                        String   @id @default(cuid())
+  name                      String
+  category                  String // Vinyl | Transfer | HTV | Cardstock | StickerPaper | Other
+  color                     String?
+  finish                    String? // Glossy | Matte | Metallic | Transparent | Other
+  brand                     String?
+  supplierDefault           String?
+  unit                      String   @default("cm2")
+  totalAreaCm2              Float    @default(0)
+  totalValue                Float    @default(0)
+  weightedAverageCostPerCm2 Float    @default(0)
+  weightedAverageCostPerM2  Float    @default(0)
+  lowStockThresholdCm2      Float    @default(0)
+  isInventoryTracked        Boolean  @default(true) // false = "material de costo" (maquilado/pedido bajo demanda, sin stock real que trackear); true = inventario real que se compra y se va gastando
+  sheetWidthCm              Float? // si el material se vende/usa por hoja de tamaño fijo (ej. 21.6 para tamaño carta), ancho de esa hoja
+  sheetHeightCm             Float? // alto de esa hoja
+  purchaseUrl               String? // link (Mercado Libre, tienda, etc.) de donde se compra este material
+  isArchived                Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  purchases           Purchase[]
+  consumptions        InventoryConsumption[]
+  catalogUsages       CatalogItemMaterial[]
+  orderLineItemUsages QuoteLineItem[]
+}
+
+model Purchase {
+  id           String   @id @default(cuid())
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id])
+  supplier     String?
+  widthCm      Float
+  heightCm     Float
+  quantity     Float
+  grossPrice   Float
+  discount     Float    @default(0)
+  finalPrice   Float
+  totalAreaCm2 Float
+  costPerCm2   Float
+  costPerM2    Float
+  purchaseDate DateTime @default(now())
+  notes        String?
+  createdAt    DateTime @default(now())
+}
+
+// Pedido (tarjeta de Kanban) ligado a un Lead: carrito tipo cotizacion con
+// lineas de catalogo (precio fijo) + lineas "Otro" (100% manuales, ver
+// QuoteLineItem). Reemplaza el Quote suelto de la version anterior — ahora
+// todo pedido pertenece a un lead (catalogo de clientes), y un mismo lead
+// puede acumular varios Order en el tiempo (historial). El status del Order
+// es independiente del status del Lead: el Order avanza por las fases de
+// produccion (Disenando..Entregado), el Lead por sus fases de relacion
+// (Contacto..Cliente). Reemplaza tambien el flujo viejo de area x
+// complejidad (lib/pricing, ya no se usa desde aqui, se deja intacto en el
+// repo por si se reusa despues).
+model Order {
+  id           String    @id @default(cuid())
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id])
+  interest     String // que se vendio/se esta trabajando en ESTE pedido
+  status       String    @default("Disenando") // Disenando | DisenoAprobado | Maquilando | Completado | Entregado
+  notes        String?
+  deliveryDate DateTime? // para el calendario de entregas (fase futura, campo listo desde ahora)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lineItems    QuoteLineItem[]
+  payments     Payment[]
+  consumptions InventoryConsumption[]
+}
+
+// Linea del carrito de un Order: catalogItemId presente = del catalogo de
+// precio fijo (snapshot de nombre/precio al agregar); catalogItemId null =
+// linea "Otro" 100% manual (descripcion libre + precio a mano). Las lineas
+// "Otro" pueden declarar opcionalmente un material y area consumida, para
+// poder descontar inventario cuando no hay receta automatica (ver
+// updateOrderStatus en lib/actions/orders.ts).
+model QuoteLineItem {
+  id                   String       @id @default(cuid())
+  orderId              String
+  order                Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId        String?
+  catalogItem          CatalogItem? @relation(fields: [catalogItemId], references: [id])
+  description          String
+  quantity             Int
+  unitPrice            Float
+  lineTotal            Float
+  otherMaterialId      String?
+  otherMaterial        Material?    @relation(fields: [otherMaterialId], references: [id])
+  otherMaterialAreaCm2 Float?
+  createdAt            DateTime     @default(now())
+}
+
+// Pago real recibido sobre un Order (anticipo o liquidacion). paidAt es la
+// fecha REAL en que se recibio el dinero (para contabilidad semanal por
+// fecha de pago, no de creacion del pedido) — createdAt es solo la fecha en
+// que se capturo el registro en el sistema.
+model Payment {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount    Float
+  type      String // "Anticipo" | "Liquidacion"
+  paidAt    DateTime @default(now())
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model InventoryConsumption {
+  id                 String       @id @default(cuid())
+  orderId            String?
+  order              Order?       @relation(fields: [orderId], references: [id])
+  catalogSaleId      String?
+  catalogSale        CatalogSale? @relation(fields: [catalogSaleId], references: [id])
+  materialId         String
+  material           Material     @relation(fields: [materialId], references: [id])
+  areaConsumedCm2    Float
+  costConsumed       Float
+  costPerCm2Snapshot Float
+  consumedAt         DateTime     @default(now())
+  notes              String?
+}
+
+// Catálogo de precio fijo (etiquetas escolares + kits) — segunda línea de
+// venta del negocio, separada del flujo de pedidos custom (Order). Reusa
+// InventoryConsumption (vía catalogSaleId) para descontar inventario con el
+// mismo mecanismo que ya usa Order, sin duplicar esa tabla.
+model CatalogItem {
+  id          String   @id @default(cuid())
+  name        String
+  isKit       Boolean  @default(false)
+  unitPrice   Float
+  otherCostPerUnit Float @default(0) // tinta + luz + tiempo del dueño por unidad, no viene de la receta de materiales
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  materials      CatalogItemMaterial[]
+  sales          CatalogSale[]
+  orderLineItems QuoteLineItem[]
+}
+
+model CatalogItemMaterial {
+  id             String      @id @default(cuid())
+  catalogItemId  String
+  catalogItem    CatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+  materialId     String
+  material       Material    @relation(fields: [materialId], references: [id])
+  areaCm2PerUnit Float // cm2 de este material que consume UNA unidad vendida del item/kit
+}
+
+model CatalogSale {
+  id                String      @id @default(cuid())
+  catalogItemId     String
+  catalogItem       CatalogItem @relation(fields: [catalogItemId], references: [id])
+  quantity          Int
+  unitPriceSnapshot Float // precio del CatalogItem al momento de vender (congelado, igual criterio que weightedAverageCostSnapshot en Quote)
+  totalPrice        Float
+  customerName      String?
+  notes             String?
+  createdAt         DateTime    @default(now())
+
+  consumptions InventoryConsumption[]
+}
+
+// Catalogo de clientes: cada Lead es un contacto real de WhatsApp, con su
+// propio historial de pedidos (Order) a lo largo del tiempo. El status del
+// Lead refleja la relacion comercial (Contacto -> Ganado -> Cliente, con
+// Pendiente/Perdido como excepciones), NO el avance de un pedido puntual
+// (eso vive en Order.status). Un lead puede volver meses despues con un
+// pedido nuevo — cada Order es independiente pero pertenece al mismo Lead.
+model Lead {
+  id        String   @id @default(cuid())
+  name      String?
+  phone     String?
+  notes     String? // notas generales del contacto, no de un pedido en particular
+  status    String   @default("Contacto") // Contacto | Pendiente | Ganado | Cliente | Perdido
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+}
+
+model Settings {
+  id                          String   @id @default(cuid())
+  currency                    String   @default("MXN")
+  defaultComplexityFactor     Float    @default(3.5)
+  defaultMinimumPricePerPiece Float    @default(8)
+  defaultMinimumJobPrice      Float    @default(300)
+  defaultWastePercentage      Float    @default(0)
+  premiumMultiplier           Float    @default(1.10)
+  minimumAcceptableMultiplier Float    @default(0.90)
+  roundingRule                String   @default("nearest10")
+  businessName                String   @default("VinylOps")
+  ownerName                   String?
+  theme                       String   @default("dark")
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+}

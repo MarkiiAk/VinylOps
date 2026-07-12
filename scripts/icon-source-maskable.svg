@@ -1,0 +1,33 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="30%" cy="25%" r="85%">
+      <stop offset="0%" stop-color="#1a1024"/>
+      <stop offset="55%" stop-color="#0a0710"/>
+      <stop offset="100%" stop-color="#020204"/>
+    </radialGradient>
+    <linearGradient id="blade" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ecf7"/>
+      <stop offset="55%" stop-color="#4fc9ff"/>
+      <stop offset="100%" stop-color="#ad74ff"/>
+    </linearGradient>
+    <linearGradient id="bladeGlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00ecf7" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ad74ff" stop-opacity="0.55"/>
+    </linearGradient>
+  </defs>
+
+  <!-- fondo: cubre todo el lienzo, incluso lo que el SO recorte en circulo -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- todo el contenido grafico vive dentro del 80% central (safe zone maskable):
+       centro 256,256, radio seguro ~205px -->
+  <rect x="166" y="166" width="180" height="180" rx="24"
+        transform="rotate(45 256 256)"
+        fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="9"/>
+
+  <line x1="185" y1="327" x2="327" y2="185" stroke="url(#bladeGlow)" stroke-width="38" stroke-linecap="round"/>
+  <line x1="193" y1="319" x2="319" y2="193" stroke="url(#blade)" stroke-width="18" stroke-linecap="round"/>
+
+  <circle cx="319" cy="193" r="13" fill="#00ecf7"/>
+  <circle cx="193" cy="319" r="13" fill="#ad74ff"/>
+</svg>

@@ -1,0 +1,252 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * VinylOps Pricing Studio — theme claro/oscuro, switchable via next-themes
+ * (ver components/theme-provider.tsx y el toggle en components/dashboard-nav.tsx).
+ *
+ * Modo claro (":root", default): paleta de marca "papeleria kawaii" tomada
+ * directo del catalogo de precios impreso del negocio (crema, lavanda, rosa,
+ * menta, mostaza, celeste). Pensado para uso de cara al cliente / catalogo.
+ *
+ * Modo oscuro (".dark"): el theme neon/futurista original, sin cambios —
+ * pensado para verse en una tablet/monitor junto a la cortadora, con acentos
+ * neon para escaneo visual rapido de estados.
+ *
+ * Paleta dark (full palette deliberada, no restrained: es un dashboard de
+ * datos financieros donde el color es semantico, no decorativo):
+ *  - Fondo casi negro con tinte violeta (nunca negro puro) -> profundidad de taller.
+ *  - Cian  -> accion primaria / navegacion activa / info.
+ *  - Violeta -> marca / elementos destacados / glow de "recomendado".
+ *  - Rosa/magenta -> acento de marca secundario (CTA "Nueva cotizacion", Smart Quote).
+ *  - Verde / ambar / rojo -> semantica de margen y estado, SEPARADA de los
+ *    acentos de marca para que "buen margen" nunca se confunda con "accion primaria".
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-heading);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Acentos neon custom, disponibles como bg-neon-cyan, text-neon-violet, etc. */
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-violet: var(--neon-violet);
+  --color-neon-pink: var(--neon-pink);
+
+  /* Semantica de margen/estado — independiente de los acentos de marca. */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * :root = tema claro (default). Paleta "papeleria kawaii" del catalogo
+ * impreso: fondo crema, acentos pastel (lavanda/rosa/menta/mostaza/celeste).
+ * next-themes agrega la clase .dark sobre <html> para el tema oscuro (mas
+ * abajo), siguiendo el patron estandar attribute="class".
+ */
+:root {
+  --background: #FBF2EA;
+  --foreground: #3A2A28;
+  --card: #FFFFFF;
+  --card-foreground: #3A2A28;
+  --popover: #FFFFFF;
+  --popover-foreground: #3A2A28;
+  --primary: #9B6FCE;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F6A9BE;
+  --secondary-foreground: #3A2A28;
+  --muted: #F3E7DC;
+  --muted-foreground: #8A7368;
+  --accent: #7ED9C7;
+  --accent-foreground: #1F3D37;
+  --destructive: #E0556B;
+  --border: #EAD9CC;
+  --input: #EAD9CC;
+  --ring: #9B6FCE99;
+
+  --chart-1: #9B6FCE;
+  --chart-2: #F6A9BE;
+  --chart-3: #7ED9C7;
+  --chart-4: #F3D46B;
+  --chart-5: #A9DEE4;
+
+  --sidebar: #FFF8F2;
+  --sidebar-foreground: #3A2A28;
+  --sidebar-primary: #9B6FCE;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F6A9BE33;
+  --sidebar-accent-foreground: #3A2A28;
+  --sidebar-border: #EAD9CC;
+  --sidebar-ring: #9B6FCE99;
+
+  --radius: 0.75rem;
+
+  /* Nombres de variable conservados por compatibilidad con clases existentes
+     (bg-neon-cyan, text-neon-violet, etc.) — en claro no son literalmente
+     "neon", son las mismas tonalidades de marca ajustadas para legibilidad
+     sobre fondo crema. */
+  --neon-cyan: #4FB8C4;
+  --neon-violet: #9B6FCE;
+  --neon-pink: #E87CA0;
+
+  /* Semantica de margen/estado. Verde = buen margen, ambar = margen bajo,
+     rojo = perdida/critico. Nunca se reutilizan para marca/navegacion. */
+  --success: #2F9E6B;
+  --success-foreground: #EAFBF3;
+  --warning: #C98A1D;
+  --warning-foreground: #FFF7E6;
+  --danger: #D14343;
+  --danger-foreground: #FFF1F1;
+}
+
+.dark {
+  --background: oklch(0.09 0.01 280);
+  --foreground: oklch(0.96 0.01 280);
+  --card: oklch(0.15 0.02 280 / 60%);
+  --card-foreground: oklch(0.96 0.01 280);
+  --popover: oklch(0.13 0.018 280);
+  --popover-foreground: oklch(0.96 0.01 280);
+  --primary: oklch(0.78 0.16 200);
+  --primary-foreground: oklch(0.09 0.01 280);
+  --secondary: oklch(0.2 0.03 285);
+  --secondary-foreground: oklch(0.96 0.01 280);
+  --muted: oklch(0.18 0.02 280);
+  --muted-foreground: oklch(0.68 0.02 280);
+  --accent: oklch(0.28 0.09 300);
+  --accent-foreground: oklch(0.96 0.01 280);
+  --destructive: oklch(0.65 0.24 20);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.78 0.16 200 / 60%);
+
+  --chart-1: oklch(0.78 0.16 200);
+  --chart-2: oklch(0.68 0.2 300);
+  --chart-3: oklch(0.72 0.22 350);
+  --chart-4: oklch(0.75 0.15 140);
+  --chart-5: oklch(0.8 0.18 80);
+
+  --sidebar: oklch(0.08 0.014 280);
+  --sidebar-foreground: oklch(0.9 0.01 280);
+  --sidebar-primary: oklch(0.68 0.2 300);
+  --sidebar-primary-foreground: oklch(0.09 0.01 280);
+  --sidebar-accent: oklch(0.2 0.03 285);
+  --sidebar-accent-foreground: oklch(0.96 0.01 280);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.78 0.16 200 / 60%);
+
+  --neon-cyan: oklch(0.85 0.16 200);
+  --neon-violet: oklch(0.68 0.2 300);
+  --neon-pink: oklch(0.72 0.22 350);
+
+  --success: oklch(0.72 0.19 149);
+  --success-foreground: oklch(0.14 0.03 149);
+  --warning: oklch(0.8 0.17 80);
+  --warning-foreground: oklch(0.16 0.03 80);
+  --danger: oklch(0.68 0.22 25);
+  --danger-foreground: oklch(0.97 0.01 25);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+@layer base {
+  /*
+   * Fondo "aurora" oscuro: tres manchas de gradiente radial muy tenues
+   * (cian, violeta, magenta) fijas detras del contenido. Discreto a proposito
+   * -- nunca arcoiris saturado. Se aplica sobre <body> via clase utilitaria
+   * para no forzar el efecto en superficies anidadas (ej. dialogs).
+   *
+   * Efecto especifico del tema oscuro (tuneado para fondo casi negro):
+   * en claro (fondo crema) se ve como ruido visual, asi que se escopea
+   * bajo .dark y no renderiza nada en modo claro.
+   */
+  .dark .bg-aurora {
+    background-image:
+      radial-gradient(60% 50% at 15% 0%, oklch(0.4 0.13 200 / 16%) 0%, transparent 60%),
+      radial-gradient(50% 45% at 90% 10%, oklch(0.35 0.14 300 / 14%) 0%, transparent 65%),
+      radial-gradient(55% 40% at 50% 100%, oklch(0.32 0.13 350 / 10%) 0%, transparent 70%);
+    background-attachment: fixed;
+  }
+
+  /* Glassmorphism utilitario para cards que lo necesiten explicitamente. */
+  .glass-panel {
+    background-color: var(--card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid oklch(1 0 0 / 8%);
+  }
+
+  /* Glow sutil para el tier "recomendado" y estados destacados — efecto de
+     tema oscuro (glow neon sobre fondo casi negro), escopeado bajo .dark. */
+  .dark .glow-violet {
+    box-shadow: 0 0 0 1px oklch(0.68 0.2 300 / 35%), 0 8px 40px -12px oklch(0.68 0.2 300 / 55%);
+  }
+  .dark .glow-cyan {
+    box-shadow: 0 0 0 1px oklch(0.85 0.16 200 / 30%), 0 8px 32px -14px oklch(0.85 0.16 200 / 45%);
+  }
+}
+
+/* Safe-area para iPhone (notch / home indicator), con viewport-fit=cover en layout root. */
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
