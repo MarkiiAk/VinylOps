@@ -59,6 +59,18 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const profitAfterLabor = grossProfit - totalLabor;
   const marginAfterLabor = total ? profitAfterLabor / total : 0;
 
+  // FASE 3 (V1): días restantes / atraso, calculados sobre la fecha
+  // compromiso (order.deliveryDate) vs. hoy — solo tiene sentido mientras el
+  // pedido no se haya entregado todavía.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const commitmentDate = order.deliveryDate ? new Date(order.deliveryDate) : null;
+  if (commitmentDate) commitmentDate.setHours(0, 0, 0, 0);
+  const daysRemaining = commitmentDate
+    ? Math.round((commitmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isLate = order.status !== "Entregado" && daysRemaining !== null && daysRemaining < 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -132,6 +144,42 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         Nota: utilidad no es lo mismo que efectivo — &quot;Ganancia&quot; aquí es sobre el total vendido, no sobre lo cobrado.
       </p>
 
+      <div className="glass-panel grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl p-4 text-sm sm:grid-cols-4">
+        <div>
+          <p className="text-xs text-muted-foreground">Fecha de aprobación</p>
+          <p className="font-medium text-foreground">
+            {order.designApprovedAt ? formatDate(order.designApprovedAt) : "Sin aprobar"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Fecha compromiso</p>
+          <p className="font-medium text-foreground">
+            {order.deliveryDate ? formatDate(order.deliveryDate) : "Sin definir"}
+            {order.deliveryDate ? (
+              <span className="ml-1 text-xs text-muted-foreground">
+                {order.deliveryDateIsManual ? "(manual)" : "(auto)"}
+              </span>
+            ) : null}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Días restantes</p>
+          <p className={`font-medium ${isLate ? "text-destructive" : "text-foreground"}`}>
+            {order.status === "Entregado"
+              ? "—"
+              : daysRemaining === null
+                ? "Sin fecha"
+                : isLate
+                  ? `Atrasado ${Math.abs(daysRemaining)} día(s)`
+                  : `${daysRemaining} día(s)`}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Entrega real</p>
+          <p className="font-medium text-foreground">{order.deliveredAt ? formatDate(order.deliveredAt) : "Pendiente"}</p>
+        </div>
+      </div>
+
       <OrderDeliveryDateEditor
         orderId={order.id}
         deliveryDate={order.deliveryDate ? order.deliveryDate.toISOString() : null}
@@ -194,7 +242,8 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               <div key={payment.id} className="flex items-center justify-between gap-4 px-4 py-3">
                 <div className="min-w-0 space-y-0.5">
                   <p className="text-sm font-medium text-foreground">
-                    {payment.type === "Anticipo" ? "Anticipo" : "Liquidación"}
+                    {payment.type === "Anticipo" ? "Anticipo" : payment.type === "Liquidacion" ? "Liquidación" : "Otro"}
+                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {payment.method}</span>
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {formatDate(payment.paidAt)}

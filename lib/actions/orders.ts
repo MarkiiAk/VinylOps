@@ -24,6 +24,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@/lib/generated/prisma/client'
 import { computeLineSnapshot, deriveKitCosts } from '@/lib/costing'
+import { decideOrderDateUpdate, toDateKey } from '@/lib/business-days'
 
 export interface QuoteLineItemInput {
   catalogItemId?: string
@@ -211,6 +212,10 @@ export async function createOrder(input: CreateOrderInput) {
         notes: input.notes?.trim() || undefined,
         status: input.status ?? 'Disenando',
         deliveryDate: input.deliveryDate,
+        // Si se captura a mano al crear el pedido, cuenta como MANUAL — no
+        // se recalcula sola cuando el diseño se apruebe después (ver
+        // decideOrderDateUpdate en lib/business-days.ts).
+        deliveryDateIsManual: Boolean(input.deliveryDate),
       },
     })
 
@@ -246,21 +251,70 @@ const CONSUMABLE_STATUSES = ['Completado', 'Entregado']
 
 export interface UpdateOrderStatusOptions {
   consumeInventory?: boolean
+  /** true = la UI ya confirmó explícitamente recalcular la fecha compromiso sobre una que ya existía (manual o de una aprobación anterior). */
+  confirmRecalculateDeliveryDate?: boolean
 }
 
-export async function updateOrderStatus(id: string, status: string, opts: UpdateOrderStatusOptions = {}) {
+export interface UpdateOrderStatusResult {
+  order: Awaited<ReturnType<typeof updateOrderStatusInternal>>['order']
+  /** true = había una fecha compromiso previa y NO se recalculó porque no hubo confirmación — la UI debe preguntar y reintentar con confirmRecalculateDeliveryDate: true. */
+  needsDeliveryDateConfirmation: boolean
+}
+
+async function updateOrderStatusInternal(
+  tx: Prisma.TransactionClient,
+  id: string,
+  status: string,
+  opts: UpdateOrderStatusOptions
+) {
+  const existing = await tx.order.findUnique({ where: { id } })
+  if (!existing) {
+    throw new Error('No se encontró el pedido a actualizar')
+  }
+
+  const nonWorkingDays = await tx.nonWorkingDay.findMany()
+  const nonWorkingDates = new Set(nonWorkingDays.map((d) => toDateKey(d.date)))
+
+  const dateDecision = decideOrderDateUpdate({
+    newStatus: status,
+    order: {
+      designApprovedAt: existing.designApprovedAt,
+      deliveryDate: existing.deliveryDate,
+      deliveredAt: existing.deliveredAt,
+    },
+    now: new Date(),
+    nonWorkingDates,
+    confirmRecalculateDeliveryDate: opts.confirmRecalculateDeliveryDate,
+  })
+
+  const order = await tx.order.update({
+    where: { id },
+    data: {
+      status,
+      ...(dateDecision.designApprovedAt ? { designApprovedAt: dateDecision.designApprovedAt } : {}),
+      ...(dateDecision.deliveryDate ? { deliveryDate: dateDecision.deliveryDate } : {}),
+      ...(dateDecision.deliveryDateIsManual !== undefined ? { deliveryDateIsManual: dateDecision.deliveryDateIsManual } : {}),
+      ...(dateDecision.deliveredAt ? { deliveredAt: dateDecision.deliveredAt } : {}),
+    },
+    include: {
+      lineItems: { include: { catalogItem: { include: { materials: true } } } },
+    },
+  })
+
+  return { order, needsDeliveryDateConfirmation: dateDecision.needsConfirmation }
+}
+
+export async function updateOrderStatus(
+  id: string,
+  status: string,
+  opts: UpdateOrderStatusOptions = {}
+): Promise<UpdateOrderStatusResult> {
   if (!ORDER_STATUSES.includes(status)) {
     throw new Error(`Status de pedido inválido: ${status}`)
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const order = await tx.order.update({
-      where: { id },
-      data: { status },
-      include: {
-        lineItems: { include: { catalogItem: { include: { materials: true } } } },
-      },
-    })
+    const { order, needsDeliveryDateConfirmation } = await updateOrderStatusInternal(tx, id, status, opts)
 
     const shouldConsume = opts.consumeInventory === true && CONSUMABLE_STATUSES.includes(status)
 
@@ -292,11 +346,11 @@ export async function updateOrderStatus(id: string, status: string, opts: Update
       }
     }
 
-    return order
+    return { order, needsDeliveryDateConfirmation }
   })
 
   revalidatePath('/pedidos')
-  revalidatePath(`/leads/${result.leadId}`)
+  revalidatePath(`/leads/${result.order.leadId}`)
   revalidatePath('/materiales')
   revalidatePath('/')
 
@@ -413,10 +467,16 @@ export async function setOrderNotes(id: string, notes: string) {
   return order
 }
 
+/**
+ * Edición MANUAL de la fecha compromiso de entrega — siempre marca
+ * deliveryDateIsManual: true (ver decideOrderDateUpdate en
+ * lib/business-days.ts), para que una futura aprobación/re-aprobación de
+ * diseño nunca la recalcule sin preguntar primero.
+ */
 export async function setOrderDeliveryDate(id: string, deliveryDate: Date | null) {
   const order = await prisma.order.update({
     where: { id },
-    data: { deliveryDate },
+    data: { deliveryDate, deliveryDateIsManual: deliveryDate !== null },
   })
 
   revalidatePath('/pedidos')

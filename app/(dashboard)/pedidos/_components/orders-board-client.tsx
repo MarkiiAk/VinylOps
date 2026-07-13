@@ -74,7 +74,18 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
                       {formatMXN(order.total)}
                     </span>
                     {order.deliveryDate ? (
-                      <span className="text-xs text-muted-foreground">Entrega: {formatDate(order.deliveryDate)}</span>
+                      <span
+                        className={`text-xs ${
+                          order.status !== "Entregado" && new Date(order.deliveryDate) < new Date(new Date().toDateString())
+                            ? "font-medium text-destructive"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {order.status !== "Entregado" && new Date(order.deliveryDate) < new Date(new Date().toDateString())
+                          ? "Atrasado · "
+                          : "Entrega: "}
+                        {formatDate(order.deliveryDate)}
+                      </span>
                     ) : null}
                   </div>
 

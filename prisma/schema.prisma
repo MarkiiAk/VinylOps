@@ -68,20 +68,40 @@ model Purchase {
 // (Contacto..Cliente). Reemplaza tambien el flujo viejo de area x
 // complejidad (lib/pricing, ya no se usa desde aqui, se deja intacto en el
 // repo por si se reusa despues).
+// FASE 3 (V1, regla de dias habiles): designApprovedAt guarda CUANDO se
+// aprobo el diseno por primera vez (o la ultima vez, si hubo regresion y
+// re-aprobacion — ver updateOrderStatus en lib/actions/orders.ts).
+// deliveryDate sigue siendo la fecha COMPROMISO de entrega (calculada
+// automaticamente 3 dias habiles despues de designApprovedAt, o capturada a
+// mano) — deliveryDateIsManual distingue cual de las dos fue. deliveredAt
+// se llena solo la primera vez que el pedido llega a "Entregado".
 model Order {
-  id           String    @id @default(cuid())
-  leadId       String
-  lead         Lead      @relation(fields: [leadId], references: [id])
-  interest     String // que se vendio/se esta trabajando en ESTE pedido
-  status       String    @default("Disenando") // Disenando | DisenoAprobado | Maquilando | Completado | Entregado
-  notes        String?
-  deliveryDate DateTime? // para el calendario de entregas (fase futura, campo listo desde ahora)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  leadId               String
+  lead                 Lead      @relation(fields: [leadId], references: [id])
+  interest             String // que se vendio/se esta trabajando en ESTE pedido
+  status               String    @default("Disenando") // Disenando | DisenoAprobado | Maquilando | Completado | Entregado
+  notes                String?
+  designApprovedAt     DateTime? // fecha real de aprobacion de diseno (ultima aprobacion)
+  deliveryDate         DateTime? // fecha COMPROMISO de entrega (auto-calculada o manual)
+  deliveryDateIsManual Boolean   @default(false) // true = el dueño la capturo/edito a mano, no se recalcula sola
+  deliveredAt          DateTime? // fecha real en que se marco "Entregado"
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   lineItems    OrderLineItem[]
   payments     Payment[]
   consumptions InventoryConsumption[]
+}
+
+// Configuracion simple de dias no laborables (feriados, dia que el negocio
+// no trabaja) para la regla de "3 dias habiles despues de aprobar diseno".
+// Sin integracion a calendario externo (V1) — solo una lista editable.
+model NonWorkingDay {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  label     String?
+  createdAt DateTime @default(now())
 }
 
 // Linea del carrito de un Order: catalogItemId presente = del catalogo de
@@ -143,7 +163,8 @@ model Payment {
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount    Float
-  type      String // "Anticipo" | "Liquidacion"
+  type      String // "Anticipo" | "Liquidacion" | "Otro"
+  method    String // "Efectivo" | "Transferencia" | "Tarjeta" | "Otro"
   paidAt    DateTime @default(now())
   notes     String?
   createdAt DateTime @default(now())

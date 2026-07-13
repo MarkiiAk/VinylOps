@@ -1,17 +1,12 @@
 'use server'
 
-// Server actions del catálogo de precio fijo (CatalogItem + CatalogItemMaterial
-// + CatalogSale) de VinylOps Pricing Studio.
+// Server actions del catálogo de precio fijo (CatalogItem + CatalogItemMaterial)
+// de VinylOps Pricing Studio.
 //
-// Este catálogo es una línea de venta separada del flujo de pedidos custom
-// (Order): precio fijo por producto/kit, en vez de pricing calculado por
-// área+complejidad. Reusa InventoryConsumption (vía catalogSaleId) para
-// descontar inventario con el mismo mecanismo que ya usa updateOrderStatus en
-// lib/actions/orders.ts, sin duplicar esa tabla.
-//
-// Igual que weightedAverageCostSnapshot en QuoteMaterialUsage, el
-// unitPriceSnapshot de cada CatalogSale se congela al momento de vender y
-// nunca se recalcula después aunque el CatalogItem cambie de precio.
+// FASE 3 (V1, flujo único de ventas): el único mecanismo de venta real es
+// Lead → Order → OrderLineItem → Payment (ver lib/actions/orders.ts). Este
+// catálogo define productos/kits y su costeo, pero YA NO tiene su propio
+// camino de venta (CatalogSale/sellCatalogItem) — ver nota más abajo.
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
@@ -22,13 +17,6 @@ import {
   deriveKitMaterialRecipe,
   roundForStorage,
 } from '@/lib/costing'
-
-export interface SellCatalogItemInput {
-  catalogItemId: string
-  quantity: number
-  customerName?: string
-  notes?: string
-}
 
 export interface CatalogRecipeLineInput {
   materialId: string
@@ -238,94 +226,16 @@ export async function getCatalogItem(id: string) {
   }
 }
 
-export async function sellCatalogItem(input: SellCatalogItemInput) {
-  if (input.quantity <= 0) {
-    throw new Error('La cantidad vendida debe ser mayor a cero')
-  }
-
-  const catalogItem = await prisma.catalogItem.findUnique({
-    where: { id: input.catalogItemId },
-    include: { materials: { include: { material: true } } },
-  })
-
-  if (!catalogItem) {
-    throw new Error('No se encontró el item de catálogo a vender')
-  }
-
-  const unitPriceSnapshot = catalogItem.unitPrice
-  const totalPrice = unitPriceSnapshot * input.quantity
-
-  const sale = await prisma.$transaction(async (tx) => {
-    const created = await tx.catalogSale.create({
-      data: {
-        catalogItemId: catalogItem.id,
-        quantity: input.quantity,
-        unitPriceSnapshot,
-        totalPrice,
-        customerName: input.customerName?.trim() || undefined,
-        notes: input.notes?.trim() || undefined,
-      },
-    })
-
-    for (const line of catalogItem.materials) {
-      const material = await tx.material.findUnique({ where: { id: line.materialId } })
-      if (!material) continue
-
-      const areaRequested = line.areaCm2PerUnit * input.quantity
-      const areaToConsume = Math.min(areaRequested, material.totalAreaCm2)
-      const wasClamped = areaToConsume < areaRequested
-      const costToConsume = areaToConsume * material.weightedAverageCostPerCm2
-
-      await tx.inventoryConsumption.create({
-        data: {
-          catalogSaleId: created.id,
-          materialId: line.materialId,
-          areaConsumedCm2: areaToConsume,
-          costConsumed: costToConsume,
-          costPerCm2Snapshot: material.weightedAverageCostPerCm2,
-          notes: wasClamped
-            ? `Stock insuficiente: se solicitaban ${areaRequested.toFixed(2)} cm² y sólo había ${material.totalAreaCm2.toFixed(2)} cm² disponibles. Se consumió el stock disponible.`
-            : undefined,
-        },
-      })
-
-      const newTotalArea = Math.max(0, material.totalAreaCm2 - areaToConsume)
-      const newTotalValue = Math.max(0, material.totalValue - costToConsume)
-
-      await tx.material.update({
-        where: { id: line.materialId },
-        data: {
-          totalAreaCm2: newTotalArea,
-          totalValue: newTotalValue,
-          // FASE 1 (V1, 2026-07): el costo promedio ponderado YA NO se
-          // resetea a 0 cuando el área llega a 0. Esa regla causó un
-          // incidente real (un producto de catálogo mostró costo/margen en
-          // $0 después de que una prueba consumiera todo el stock de un
-          // material). El costo vigente ahora se conserva como "último
-          // costo promedio conocido" hasta la siguiente compra, que sí lo
-          // recalcula (ver lib/actions/purchases.ts). El catálogo debe
-          // poder seguir mostrando un costo válido aunque el inventario
-          // esté temporalmente en 0.
-        },
-      })
-    }
-
-    return created
-  })
-
-  revalidatePath('/catalogo')
-  revalidatePath('/materiales')
-  revalidatePath('/')
-
-  return sale
-}
-
-export async function listCatalogSales() {
-  return prisma.catalogSale.findMany({
-    include: { catalogItem: true },
-    orderBy: { createdAt: 'desc' },
-  })
-}
+// FASE 3 (V1, flujo único de ventas): sellCatalogItem/listCatalogSales se
+// retiraron de aquí — no tenían ningún consumidor en la UI (confirmado por
+// búsqueda global antes de borrar) y representaban un segundo mecanismo de
+// venta paralelo a Lead → Order → OrderLineItem → Payment, prohibido por la
+// regla de negocio de "un solo flujo oficial de ventas". La tabla
+// `CatalogSale` y sus filas históricas NO se borraron ni se migraron: quedan
+// archivadas tal cual en la base como registro histórico de solo lectura
+// (sin ningún punto de entrada nuevo, ni server action ni UI). Si algún día
+// se necesita consultarlas, se puede volver a exponer un `listCatalogSales`
+// de solo lectura sin reactivar `sellCatalogItem`.
 
 /**
  * Crea un CatalogItem + su receta (CatalogItemMaterial) en una transacción.

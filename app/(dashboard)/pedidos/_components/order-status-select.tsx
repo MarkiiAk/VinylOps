@@ -35,8 +35,25 @@ export function OrderStatusSelect({ orderId, status, size = "sm", className }: O
     if (!nextStatus || nextStatus === status) return;
     startTransition(async () => {
       try {
-        await updateOrderStatus(orderId, nextStatus, { consumeInventory: true });
+        const result = await updateOrderStatus(orderId, nextStatus, { consumeInventory: true });
         toast.success(`Status actualizado a ${nextStatus}`);
+
+        // FASE 3 (V1, regla de días hábiles): ya había una fecha compromiso
+        // (manual o de una aprobación anterior) — nunca se sobrescribe sola,
+        // se pregunta antes de recalcularla.
+        if (result.needsDeliveryDateConfirmation) {
+          const confirmed = window.confirm(
+            "Este pedido ya tenía una fecha de entrega comprometida. ¿Quieres recalcularla como 3 días hábiles a partir de hoy?"
+          );
+          if (confirmed) {
+            await updateOrderStatus(orderId, nextStatus, {
+              consumeInventory: true,
+              confirmRecalculateDeliveryDate: true,
+            });
+            toast.success("Fecha de entrega recalculada");
+          }
+        }
+
         router.refresh();
       } catch (error) {
         toast.error("No se pudo actualizar el status", {
