@@ -10,6 +10,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 
 export interface ListMaterialsOptions {
   includeArchived?: boolean
@@ -89,6 +90,7 @@ function validateMaterialInput(data: { name: string; category: string; lowStockT
 }
 
 export async function createMaterial(data: CreateMaterialInput) {
+  await requireSession()
   validateMaterialInput(data)
 
   const material = await prisma.material.create({
@@ -132,6 +134,7 @@ export interface UpdateMaterialInput {
 }
 
 export async function updateMaterial(id: string, data: UpdateMaterialInput) {
+  await requireSession()
   if (data.name !== undefined && !data.name.trim()) {
     throw new Error('El nombre del material no puede quedar vacío')
   }
@@ -163,6 +166,7 @@ export async function updateMaterial(id: string, data: UpdateMaterialInput) {
 }
 
 export async function archiveMaterial(id: string) {
+  await requireSession()
   const material = await prisma.material.update({
     where: { id },
     data: { isArchived: true },
@@ -176,6 +180,7 @@ export async function archiveMaterial(id: string) {
 }
 
 export async function unarchiveMaterial(id: string) {
+  await requireSession()
   const material = await prisma.material.update({
     where: { id },
     data: { isArchived: false },

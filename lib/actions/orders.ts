@@ -23,6 +23,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@/lib/generated/prisma/client'
+import { requireSession } from '@/lib/auth'
 import { computeLineSnapshot, deriveKitCosts } from '@/lib/costing'
 import { decideOrderDateUpdate, toDateKey } from '@/lib/business-days'
 
@@ -90,6 +91,7 @@ function validateLineItems(lineItems: OrderLineItemInput[]) {
 }
 
 export async function createOrder(input: CreateOrderInput) {
+  await requireSession()
   if (!input.leadId) {
     throw new Error('El pedido debe estar ligado a un lead')
   }
@@ -309,6 +311,7 @@ export async function updateOrderStatus(
   status: string,
   opts: UpdateOrderStatusOptions = {}
 ): Promise<UpdateOrderStatusResult> {
+  await requireSession()
   if (!ORDER_STATUSES.includes(status)) {
     throw new Error(`Status de pedido inválido: ${status}`)
   }
@@ -456,6 +459,7 @@ export async function getOrder(id: string) {
 }
 
 export async function setOrderNotes(id: string, notes: string) {
+  await requireSession()
   const order = await prisma.order.update({
     where: { id },
     data: { notes: notes.trim() || null },
@@ -474,6 +478,7 @@ export async function setOrderNotes(id: string, notes: string) {
  * diseño nunca la recalcule sin preguntar primero.
  */
 export async function setOrderDeliveryDate(id: string, deliveryDate: Date | null) {
+  await requireSession()
   const order = await prisma.order.update({
     where: { id },
     data: { deliveryDate, deliveryDateIsManual: deliveryDate !== null },

@@ -14,6 +14,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { evaluateOverpayment, OVERPAYMENT_MARKER } from '@/lib/payment-rules'
 
 const PAYMENT_TYPES = ['Anticipo', 'Liquidacion', 'Otro']
@@ -31,6 +32,7 @@ export interface CreatePaymentInput {
 }
 
 export async function createPayment(input: CreatePaymentInput) {
+  await requireSession()
   if (!input.orderId) {
     throw new Error('El pago debe estar ligado a un pedido')
   }

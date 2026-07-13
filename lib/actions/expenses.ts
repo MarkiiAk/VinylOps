@@ -8,6 +8,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { EXPENSE_CATEGORIES, EXPENSE_METHODS } from '@/lib/expense-categories'
 
 export interface CreateExpenseInput {
@@ -39,6 +40,7 @@ function validateExpenseInput(data: Partial<CreateExpenseInput>) {
 }
 
 export async function createExpense(data: CreateExpenseInput) {
+  await requireSession()
   validateExpenseInput(data)
 
   const expense = await prisma.expense.create({
@@ -61,6 +63,7 @@ export async function createExpense(data: CreateExpenseInput) {
 }
 
 export async function updateExpense(id: string, data: UpdateExpenseInput) {
+  await requireSession()
   validateExpenseInput(data)
 
   const expense = await prisma.expense.update({
@@ -85,6 +88,7 @@ export async function updateExpense(id: string, data: UpdateExpenseInput) {
 
 /** Elimina un gasto — sin archivado, a diferencia de catálogo/materiales: un gasto mal capturado se borra directo (la UI pide confirmación antes). */
 export async function deleteExpense(id: string) {
+  await requireSession()
   await prisma.expense.delete({ where: { id } })
 
   revalidatePath('/gastos')

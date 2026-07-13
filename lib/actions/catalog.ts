@@ -10,6 +10,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import {
   computeKitSavings,
   computeUnitDirectCost,
@@ -244,6 +245,7 @@ export async function getCatalogItem(id: string) {
  * proveedor externo sin costo de material que trackear aquí).
  */
 export async function createCatalogItem(data: CreateCatalogItemInput) {
+  await requireSession()
   validateCatalogItemInput(data)
 
   const item = await prisma.$transaction(async (tx) => {
@@ -290,6 +292,7 @@ export async function createCatalogItem(data: CreateCatalogItemInput) {
  * edita completa desde el dialog, no línea por línea.
  */
 export async function updateCatalogItem(id: string, data: UpdateCatalogItemInput) {
+  await requireSession()
   validateCatalogItemInput(data)
 
   const item = await prisma.$transaction(async (tx) => {
@@ -349,6 +352,7 @@ export interface KitComponentInput {
  * Premium al construir este modelo (ver V1_IMPLEMENTATION_REPORT.md).
  */
 export async function setKitComponents(kitId: string, components: KitComponentInput[]) {
+  await requireSession()
   for (const c of components) {
     if (!Number.isFinite(c.quantity) || c.quantity <= 0) {
       throw new Error('La cantidad de cada componente del kit debe ser mayor a cero')
@@ -415,6 +419,7 @@ export async function listCatalogItemsForKitPicker(excludeKitId?: string) {
  * CatalogItem por FK y deben seguir resolviendo su nombre/precio pasado.
  */
 export async function archiveCatalogItem(id: string) {
+  await requireSession()
   const item = await prisma.catalogItem.update({
     where: { id },
     data: { isActive: false },
@@ -426,6 +431,7 @@ export async function archiveCatalogItem(id: string) {
 }
 
 export async function unarchiveCatalogItem(id: string) {
+  await requireSession()
   const item = await prisma.catalogItem.update({
     where: { id },
     data: { isActive: true },

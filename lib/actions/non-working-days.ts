@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { toDateKey } from '@/lib/business-days'
 
 export async function listNonWorkingDays() {
@@ -20,6 +21,7 @@ export async function listNonWorkingDateKeys(): Promise<Set<string>> {
 }
 
 export async function addNonWorkingDay(date: Date, label?: string) {
+  await requireSession()
   const day = await prisma.nonWorkingDay.create({
     data: { date, label: label?.trim() || undefined },
   })
@@ -30,6 +32,7 @@ export async function addNonWorkingDay(date: Date, label?: string) {
 }
 
 export async function removeNonWorkingDay(id: string) {
+  await requireSession()
   await prisma.nonWorkingDay.delete({ where: { id } })
 
   revalidatePath('/configuracion')

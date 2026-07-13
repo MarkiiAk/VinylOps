@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 import { calculateAreaCm2, calculatePurchaseCostPerCm2, calculateWeightedAverageCost } from '@/lib/pricing'
 
 export interface PurchaseInput {
@@ -86,6 +87,7 @@ export async function previewPurchase(input: PurchaseInput): Promise<PreviewPurc
 
 /** Crea la compra y actualiza los acumulados del material, en una transacción. */
 export async function createPurchase(input: PurchaseInput) {
+  await requireSession()
   validatePurchaseInput(input)
 
   const { finalPrice, totalAreaCm2, costPerCm2, costPerM2 } = computePurchaseNumbers(input)

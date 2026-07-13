@@ -13,6 +13,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 
 export interface CreateLeadInput {
   name?: string
@@ -35,6 +36,7 @@ export async function listLeads() {
 }
 
 export async function createLead(input: CreateLeadInput) {
+  await requireSession()
   const lead = await prisma.lead.create({
     data: {
       name: input.name?.trim() || undefined,
@@ -50,6 +52,7 @@ export async function createLead(input: CreateLeadInput) {
 }
 
 export async function updateLead(id: string, input: UpdateLeadInput) {
+  await requireSession()
   const lead = await prisma.lead.update({
     where: { id },
     data: {
@@ -67,6 +70,7 @@ export async function updateLead(id: string, input: UpdateLeadInput) {
 }
 
 export async function deleteLead(id: string) {
+  await requireSession()
   await prisma.lead.delete({ where: { id } })
 
   revalidatePath('/leads')

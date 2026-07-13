@@ -333,3 +333,15 @@ model Settings {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+// FASE 7 (V1, seguridad minima): un solo usuario administrador — sin
+// multi-tenant, sin roles. Se crea automaticamente en el primer login
+// exitoso usando ADMIN_USERNAME/ADMIN_PASSWORD (ver lib/auth.ts); despues de
+// eso las credenciales viven aqui (hash), no en las variables de entorno.
+model AdminAccount {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

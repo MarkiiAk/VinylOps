@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/logout-button";
 import {
   Dialog,
   DialogContent,
@@ -142,6 +143,7 @@ export function DesktopSidebar({ businessName }: { businessName: string }) {
           <p className="truncate text-[0.7rem] text-muted-foreground">{businessName}</p>
         </div>
         <ThemeToggle />
+        <LogoutButton />
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 px-3">

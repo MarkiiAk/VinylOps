@@ -6,6 +6,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
+import { requireSession } from '@/lib/auth'
 
 export async function getSettings() {
   const existing = await prisma.settings.findFirst()
@@ -28,6 +29,7 @@ function validateSettingsInput(data: UpdateSettingsInput) {
 }
 
 export async function updateSettings(data: UpdateSettingsInput) {
+  await requireSession()
   validateSettingsInput(data)
 
   const current = await getSettings()
