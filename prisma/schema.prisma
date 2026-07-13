@@ -104,6 +104,25 @@ model NonWorkingDay {
   createdAt DateTime @default(now())
 }
 
+// FASE 4 (V1): gasto operativo — NUNCA se mezcla con Purchase (una compra
+// que aumenta stock de material va en Purchase; un gasto que no aumenta
+// inventario va aqui). Categorias iniciales (ver lib/actions/expenses.ts):
+// Publicidad, Envios y traslados, Herramientas, Mantenimiento, Servicios,
+// Empaque, Papeleria, Software, Comisiones, Otros.
+model Expense {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now()) // fecha REAL del gasto, no de captura
+  concept     String
+  category    String
+  amount      Float
+  method      String // "Efectivo" | "Transferencia" | "Tarjeta" | "Otro"
+  beneficiary String?
+  notes       String?
+  receiptUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // Linea del carrito de un Order: catalogItemId presente = del catalogo de
 // precio fijo (snapshot de nombre/precio al agregar); catalogItemId null =
 // linea "Otro" 100% manual (descripcion libre + precio a mano). Las lineas

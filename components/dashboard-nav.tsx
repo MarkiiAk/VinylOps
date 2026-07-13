@@ -19,6 +19,7 @@ import {
   MessageCircleMore,
   Boxes,
   MoreHorizontal,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ const NAV_ITEMS = [
   { href: "/materiales", label: "Materiales", icon: Layers },
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
   { href: "/calendario", label: "Calendario", icon: Calendar },
+  { href: "/gastos", label: "Gastos", icon: Receipt },
   { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 
@@ -72,6 +74,7 @@ const MOBILE_PRIMARY_ITEMS = [
 const MOBILE_MORE_ITEMS = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/materiales", label: "Materiales", icon: Layers },
+  { href: "/gastos", label: "Gastos", icon: Receipt },
   { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 

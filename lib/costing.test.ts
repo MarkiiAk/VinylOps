@@ -175,24 +175,23 @@ describe('kits: empaque compartido y ahorro', () => {
   })
 
   it('Kit Básico: precio equivalente y ahorro con los componentes y precios reales (2026-07)', () => {
-    // 3 cuadernos + 2 lápices + 1 útiles ($39 c/u) + 0.5 DTF textil ($99) + 0.5 DTF UV ($119)
+    // 3 cuadernos + 2 lápices + 1 útiles ($39 c/u) + 1 DTF textil, "media
+    // carta" ($99) + 1 DTF UV, "media carta" ($119). "Media carta" es la
+    // PRESENTACIÓN del producto individual (ya viene así de catálogo), no
+    // una fracción de otro producto — el kit incluye 1 unidad completa de
+    // cada uno. Confirmado por el dueño: equivalente $452, ahorro $103 (22.79%).
     const components = [
       { quantity: 3, componentItem: { unitPrice: 39 } },
       { quantity: 2, componentItem: { unitPrice: 39 } },
       { quantity: 1, componentItem: { unitPrice: 39 } },
-      { quantity: 0.5, componentItem: { unitPrice: 99 } },
-      { quantity: 0.5, componentItem: { unitPrice: 119 } },
+      { quantity: 1, componentItem: { unitPrice: 99 } },
+      { quantity: 1, componentItem: { unitPrice: 119 } },
     ]
     const savings = computeKitSavings(349, components)
 
-    // OJO: con los precios oficiales (2026-07) el Kit Básico NO es más
-    // barato que comprar todo por separado ($343) — el "ahorro" da -$6.
-    // Esto es un hallazgo real de negocio (ver V1_IMPLEMENTATION_REPORT.md),
-    // no un error de la fórmula: se deja el test fiel al dato oficial en vez
-    // de forzar un resultado "bonito".
-    expect(savings.equivalentPrice).toBeCloseTo(6 * 39 + 0.5 * 99 + 0.5 * 119, 6)
-    expect(savings.savingsAbsolute).toBeCloseTo(savings.equivalentPrice - 349, 6)
-    expect(savings.savingsAbsolute).toBeCloseTo(-6, 6)
+    expect(savings.equivalentPrice).toBeCloseTo(452, 6)
+    expect(savings.savingsAbsolute).toBeCloseTo(103, 6)
+    expect(savings.savingsPercentage).toBeCloseTo(0.2279, 3)
   })
 
   it('Kit Premium: precio equivalente y ahorro con los componentes y precios reales (2026-07)', () => {
@@ -225,16 +224,16 @@ describe('kits: empaque compartido y ahorro', () => {
       { quantity: 3, componentItem: cuadernos },
       { quantity: 2, componentItem: lapices },
       { quantity: 1, componentItem: utiles },
-      { quantity: 0.5, componentItem: textiles },
-      { quantity: 0.5, componentItem: agua },
+      { quantity: 1, componentItem: textiles },
+      { quantity: 1, componentItem: agua },
     ])
 
-    expect(derived.materialCostPerUnit).toBeCloseTo(3.84 * 6 + 17.5 * 0.5 + 35 * 0.5, 6)
+    expect(derived.materialCostPerUnit).toBeCloseTo(3.84 * 6 + 17.5 + 35, 6)
     expect(derived.inkCostPerUnit).toBeCloseTo(6, 6)
     expect(derived.electricityCostPerUnit).toBeCloseTo(1.5, 6)
     expect(derived.wearCostPerUnit).toBeCloseTo(6, 6)
-    expect(derived.wasteCostPerUnit).toBeCloseTo(5.5, 6)
-    expect(derived.laborCostPerUnit).toBeCloseTo(28, 6)
+    expect(derived.wasteCostPerUnit).toBeCloseTo(6.5, 6)
+    expect(derived.laborCostPerUnit).toBeCloseTo(32, 6)
 
     // Costo directo del kit = derivado + bolsa (0.49) + etiquetita (0.21) propias del kit.
     const unitDirectCost = computeUnitDirectCost({
@@ -246,7 +245,7 @@ describe('kits: empaque compartido y ahorro', () => {
       unitBagCost: 0.49,
       unitLabelCost: 0.21,
     })
-    expect(unitDirectCost).toBeCloseTo(68.99, 6)
+    expect(unitDirectCost).toBeCloseTo(96.24, 6)
   })
 
   it('deriveKitMaterialRecipe suma el consumo de materiales de cada componente * su cantidad', () => {
