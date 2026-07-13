@@ -1,13 +1,14 @@
-# Pricing Engine — placeholder
+# Costeo de compras (antes "Pricing Engine")
 
-Aqui vivira el motor de pricing de VinylOps como funciones puras (sin efectos
-secundarios, sin llamadas a Prisma directamente) que reciban datos de
-`Material`, `Quote` y `Settings` y devuelvan los calculos de:
+El motor original de pricing por área+complejidad (`calculateQuotePrices`,
+`suggestComplexityFactor`, `roundPrice`) se retiró en Fase 6 (V1, limpieza):
+cero consumidores reales desde que el negocio pasó a precio fijo por
+catálogo (ver `lib/costing.ts` para el modelo financiero granular actual).
 
-- `calculatedPrice`, `minimumAcceptablePrice`, `recommendedPrice`, `premiumPrice`
-- Costo ponderado de materiales por cotizacion (via `QuoteMaterialUsage`)
-- Reglas de redondeo (`Settings.roundingRule`) y multiplicadores
-  (`premiumMultiplier`, `minimumAcceptableMultiplier`)
+Lo único que sigue vivo aquí es el cálculo de área y costo promedio
+ponderado usado por una compra de material (`lib/actions/purchases.ts`):
 
-No implementado en esta fase (scaffold de arquitectura). Lo construye
-Ingenieria Fullstack en el siguiente sprint.
+- `calculateAreaCm2` — área de una pieza/lote.
+- `calculatePurchaseCostPerCm2` / `calculateWeightedAverageCost` — costo
+  puntual de una compra y actualización del costo promedio ponderado del
+  material.

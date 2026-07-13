@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil, X } from "lucide-react";
@@ -155,8 +155,9 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
     [materials]
   );
 
-  useEffect(() => {
-    if (!open) return;
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) return;
 
     if (item) {
       setForm({
@@ -200,7 +201,7 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
       setLines([]);
       setKitLines([]);
     }
-  }, [open, item, materials]);
+  }
 
   function addLine() {
     setLines((prev) => [...prev, newDraftLine(materials[0]?.id ?? "")]);
@@ -316,7 +317,7 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           trigger ? (

@@ -96,6 +96,14 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Excepción justificada al lint react-hooks/set-state-in-effect: este es
+    // el patrón oficial de next-themes para evitar mismatch de hidratación
+    // (SSR no puede saber el theme guardado en localStorage). No hay
+    // alternativa sin efecto: inicializar `mounted` en true en el cliente
+    // volvería a producir el mismatch que esto existe para evitar, porque el
+    // primer render de hidratación en el cliente debe coincidir con el HTML
+    // que mandó el servidor.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

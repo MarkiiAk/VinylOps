@@ -318,19 +318,18 @@ model Lead {
   orders Order[]
 }
 
+// FASE 6 (V1, limpieza): se retiraron 7 campos del motor de pricing por
+// área+complejidad ya retirado (defaultComplexityFactor,
+// defaultMinimumPricePerPiece, defaultMinimumJobPrice,
+// defaultWastePercentage, premiumMultiplier, minimumAcceptableMultiplier,
+// roundingRule) — sin ningún consumidor real, solo eran editables en
+// /configuracion sin efecto en ningún cálculo vigente.
 model Settings {
-  id                          String   @id @default(cuid())
-  currency                    String   @default("MXN")
-  defaultComplexityFactor     Float    @default(3.5)
-  defaultMinimumPricePerPiece Float    @default(8)
-  defaultMinimumJobPrice      Float    @default(300)
-  defaultWastePercentage      Float    @default(0)
-  premiumMultiplier           Float    @default(1.10)
-  minimumAcceptableMultiplier Float    @default(0.90)
-  roundingRule                String   @default("nearest10")
-  businessName                String   @default("VinylOps")
-  ownerName                   String?
-  theme                       String   @default("dark")
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  currency     String   @default("MXN")
+  businessName String   @default("VinylOps")
+  ownerName    String?
+  theme        String   @default("dark")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }

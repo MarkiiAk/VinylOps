@@ -1,23 +1,16 @@
-// Motor de pricing de VinylOps.
+// Motor de costeo de compras de VinylOps.
 //
-// El engine esta dividido en varios archivos por responsabilidad
-// (area.ts, cost.ts, complexity.ts, rounding.ts, quote.ts) en vez de un solo
-// archivo monolitico, pero este modulo re-exporta todo para que se pueda
-// importar como un unico punto de entrada: `import { ... } from '@/lib/pricing/engine'`
-// o preferentemente `from '@/lib/pricing'` (ver index.ts).
+// FASE 6 (V1, limpieza): el motor original de pricing por área+complejidad
+// (calculateQuotePrices, suggestComplexityFactor, roundPrice — vivían en
+// quote.ts/complexity.ts/rounding.ts) se retiró: cero consumidores reales
+// desde que el flujo de precio fijo (Catálogo) y el modelo financiero
+// granular (lib/costing.ts) reemplazaron ese enfoque. Lo único que sigue
+// vivo y en uso real (lib/actions/purchases.ts, purchase-form.tsx) es el
+// cálculo de área y costo promedio ponderado de una compra de material —
+// eso es lo que queda aquí.
 //
-// Decisiones de redondeo / puntos medios usadas para que el caso de prueba
-// del spec (65 etiquetas XV Regina) cuadre con los numeros esperados estan
-// documentadas en quote.ts (calculateQuotePrices) y complexity.ts
-// (suggestComplexityFactor) junto a cada regla, no repetidas aqui.
-//
-// Todas las funciones de este modulo son puras: no importan Prisma, no
-// tocan la base de datos, no dependen de React ni de Next.js. Reciben datos
-// primitivos/DTOs y devuelven datos primitivos/DTOs.
+// Todas las funciones de este módulo son puras: no importan Prisma, no
+// tocan la base de datos, no dependen de React ni de Next.js.
 
 export * from './area'
 export * from './cost'
-export * from './complexity'
-export * from './rounding'
-export * from './quote'
-export * from './types'

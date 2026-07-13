@@ -175,7 +175,7 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
       />
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>Agregar trabajo "Otro"</DialogTitle>
+          <DialogTitle>Agregar trabajo &quot;Otro&quot;</DialogTitle>
           <DialogDescription>
             Para trabajos fuera del catálogo. El precio lo escribes tú a mano, no se calcula automático.
           </DialogDescription>

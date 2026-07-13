@@ -1,6 +1,6 @@
 'use server'
 
-// Server actions de pedidos (Order + QuoteLineItem + InventoryConsumption).
+// Server actions de pedidos (Order + OrderLineItem + InventoryConsumption).
 //
 // Reemplaza lib/actions/quotes.ts: cada Order pertenece a un Lead (catálogo
 // de clientes) y representa una tarjeta de Kanban independiente — un mismo
@@ -26,7 +26,7 @@ import type { Prisma } from '@/lib/generated/prisma/client'
 import { computeLineSnapshot, deriveKitCosts } from '@/lib/costing'
 import { decideOrderDateUpdate, toDateKey } from '@/lib/business-days'
 
-export interface QuoteLineItemInput {
+export interface OrderLineItemInput {
   catalogItemId?: string
   description: string
   quantity: number
@@ -53,10 +53,10 @@ export interface CreateOrderInput {
   notes?: string
   status?: 'Disenando' | 'DisenoAprobado' | 'Maquilando' | 'Completado' | 'Entregado'
   deliveryDate?: Date
-  lineItems: QuoteLineItemInput[]
+  lineItems: OrderLineItemInput[]
 }
 
-function validateLineItems(lineItems: QuoteLineItemInput[]) {
+function validateLineItems(lineItems: OrderLineItemInput[]) {
   if (!lineItems || lineItems.length === 0) {
     throw new Error('El pedido debe incluir al menos una línea')
   }

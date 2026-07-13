@@ -78,13 +78,6 @@ async function seedSettings() {
   return prisma.settings.create({
     data: {
       currency: "MXN",
-      defaultComplexityFactor: 3.5,
-      defaultMinimumPricePerPiece: 8,
-      defaultMinimumJobPrice: 300,
-      defaultWastePercentage: 0,
-      premiumMultiplier: 1.1,
-      minimumAcceptableMultiplier: 0.9,
-      roundingRule: "nearest10",
       businessName: "By Lilo Studio",
       ownerName: "Marco Candiani",
     },

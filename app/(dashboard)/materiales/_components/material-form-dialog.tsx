@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
@@ -57,6 +57,24 @@ const emptyForm = {
   sheetHeightCm: "",
 };
 
+function buildFormState(material: MaterialFormValues | undefined) {
+  if (!material) return emptyForm;
+  return {
+    name: material.name,
+    category: material.category,
+    color: material.color ?? "",
+    finish: material.finish ?? "",
+    brand: material.brand ?? "",
+    supplierDefault: material.supplierDefault ?? "",
+    lowStockThresholdCm2: String(material.lowStockThresholdCm2 ?? 0),
+    isInventoryTracked: material.isInventoryTracked ?? true,
+    purchaseUrl: material.purchaseUrl ?? "",
+    isSoldBySheet: material.sheetWidthCm != null && material.sheetHeightCm != null,
+    sheetWidthCm: material.sheetWidthCm != null ? String(material.sheetWidthCm) : "",
+    sheetHeightCm: material.sheetHeightCm != null ? String(material.sheetHeightCm) : "",
+  };
+}
+
 /**
  * Dialog reutilizable para crear o editar un material. La categoria solo se
  * puede definir al crear — en edicion se deja fija porque cambiar la
@@ -71,28 +89,10 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  useEffect(() => {
-    if (open) {
-      setForm(
-        material
-          ? {
-              name: material.name,
-              category: material.category,
-              color: material.color ?? "",
-              finish: material.finish ?? "",
-              brand: material.brand ?? "",
-              supplierDefault: material.supplierDefault ?? "",
-              lowStockThresholdCm2: String(material.lowStockThresholdCm2 ?? 0),
-              isInventoryTracked: material.isInventoryTracked ?? true,
-              purchaseUrl: material.purchaseUrl ?? "",
-              isSoldBySheet: material.sheetWidthCm != null && material.sheetHeightCm != null,
-              sheetWidthCm: material.sheetWidthCm != null ? String(material.sheetWidthCm) : "",
-              sheetHeightCm: material.sheetHeightCm != null ? String(material.sheetHeightCm) : "",
-            }
-          : emptyForm
-      );
-    }
-  }, [open, material]);
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) setForm(buildFormState(material));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -144,7 +144,7 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           trigger ? (
@@ -274,7 +274,7 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
                 <Label htmlFor="material-sold-by-sheet">¿Se vende por hoja de tamaño fijo?</Label>
                 <p className="text-xs text-muted-foreground">
                   Ej. papel fotográfico o vinil imprimible en hojas carta. Si activas esto, el inventario se muestra
-                  en "hojas disponibles" en vez de área (cm2/m2).
+                  en &quot;hojas disponibles&quot; en vez de área (cm2/m2).
                 </p>
               </div>
               <Switch

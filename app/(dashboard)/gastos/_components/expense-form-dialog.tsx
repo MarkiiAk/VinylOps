@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
@@ -70,8 +70,9 @@ export function ExpenseFormDialog({ expense, trigger }: ExpenseFormDialogProps) 
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(emptyForm);
 
-  useEffect(() => {
-    if (!open) return;
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) return;
     if (expense) {
       setForm({
         date: expense.date.slice(0, 10),
@@ -86,7 +87,7 @@ export function ExpenseFormDialog({ expense, trigger }: ExpenseFormDialogProps) 
     } else {
       setForm(emptyForm);
     }
-  }, [open, expense]);
+  }
 
   const parsedAmount = Number(form.amount) || 0;
   const canSubmit = form.concept.trim().length > 0 && parsedAmount > 0 && Boolean(form.date);
@@ -126,7 +127,7 @@ export function ExpenseFormDialog({ expense, trigger }: ExpenseFormDialogProps) 
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           trigger ? (

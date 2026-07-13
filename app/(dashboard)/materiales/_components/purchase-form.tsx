@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ShoppingCart } from "lucide-react";
@@ -73,8 +73,9 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
   const [purchaseDate, setPurchaseDate] = useState(todayInputValue());
   const [notes, setNotes] = useState("");
 
-  useEffect(() => {
-    if (open) {
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
       setSupplier(material.supplierDefault ?? "");
       setWidthCm("");
       setHeightCm("");
@@ -84,7 +85,7 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
       setPurchaseDate(todayInputValue());
       setNotes("");
     }
-  }, [open, material.supplierDefault]);
+  }
 
   const width = parseFloat(widthCm);
   const height = parseFloat(heightCm);
@@ -155,7 +156,7 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger
         render={
           trigger ? (

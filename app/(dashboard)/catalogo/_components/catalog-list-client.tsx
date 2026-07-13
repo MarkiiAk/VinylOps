@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/empty-state";
 import { archiveCatalogItem, unarchiveCatalogItem } from "@/lib/actions/catalog";
-import { CatalogItemFormDialog, type CatalogComponentOption, type CatalogMaterialOption } from "./catalog-item-form-dialog";
+import { CatalogItemFormDialog, type CatalogMaterialOption } from "./catalog-item-form-dialog";
 
 export interface CatalogItemRow {
   id: string;
