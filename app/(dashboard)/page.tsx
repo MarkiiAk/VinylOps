@@ -1,5 +1,18 @@
 import Link from "next/link";
-import { Layers, Wallet, TrendingUp, AlertTriangle, Plus, PackagePlus, ShoppingBag } from "lucide-react";
+import {
+  Layers,
+  Wallet,
+  TrendingUp,
+  AlertTriangle,
+  Plus,
+  PackagePlus,
+  ShoppingBag,
+  Receipt,
+  HandCoins,
+  Truck,
+  Clock,
+  CircleDollarSign,
+} from "lucide-react";
 import { SectionHeading } from "@/components/section-heading";
 import { StatCard } from "@/components/stat-card";
 import { OrderStatusBadge } from "@/components/order-status-badge";
@@ -51,7 +64,76 @@ export default async function DashboardHomePage() {
         }
       />
 
+      {/*
+        FASE 5 (V1): "Ganancia del mes" se retiró — en realidad era dinero
+        cobrado, no ganancia, y mezclaba venta con cobro. Estas 8 métricas
+        vienen del mismo motor que /reportes/financiero (lib/financial-report.ts),
+        nunca se muestra una cifra que no pueda calcularse desde los
+        snapshots históricos.
+      */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Ventas del mes"
+          value={formatMXN(summary.salesThisMonth)}
+          icon={<ShoppingBag strokeWidth={2} />}
+          hint="Total vendido (venta neta), no lo cobrado"
+          delay={0}
+        />
+        <StatCard
+          label="Cobrado este mes"
+          value={formatMXN(summary.collectedThisMonth)}
+          icon={<HandCoins strokeWidth={2} />}
+          hint="Dinero que realmente entró este mes"
+          delay={0.03}
+        />
+        <StatCard
+          label="Ganancia bruta del mes"
+          value={formatMXN(summary.grossProfitThisMonth)}
+          icon={<TrendingUp strokeWidth={2} />}
+          variant={summary.grossProfitThisMonth >= 0 ? "success" : "warning"}
+          hint="Venta neta menos costo directo"
+          delay={0.06}
+        />
+        <StatCard
+          label="Gastos del mes"
+          value={formatMXN(summary.expensesThisMonth)}
+          icon={<Receipt strokeWidth={2} />}
+          hint="Gastos operativos (no compras de material)"
+          delay={0.09}
+        />
+        <StatCard
+          label="Resultado operativo"
+          value={formatMXN(summary.operatingResultThisMonth)}
+          icon={<CircleDollarSign strokeWidth={2} />}
+          variant={summary.operatingResultThisMonth >= 0 ? "success" : "warning"}
+          hint="Ganancia c/mano de obra menos gastos"
+          delay={0.12}
+        />
+        <StatCard
+          label="Saldo por cobrar"
+          value={formatMXN(summary.receivableBalance)}
+          icon={<Wallet strokeWidth={2} />}
+          hint="Total pendiente de cobro (todos los pedidos)"
+          delay={0.15}
+        />
+        <StatCard
+          label="Pedidos por entregar"
+          value={String(summary.ordersAwaitingDelivery)}
+          icon={<Truck strokeWidth={2} />}
+          hint="Aún no marcados como Entregado"
+          delay={0.18}
+        />
+        <StatCard
+          label="Pedidos atrasados"
+          value={String(summary.lateOrders)}
+          icon={<Clock strokeWidth={2} />}
+          variant={summary.lateOrders > 0 ? "warning" : "neutral"}
+          hint="Fecha compromiso ya pasó, sin entregar"
+          delay={0.21}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard
           label="Valor inventario"
           value={formatMXN(summary.totalInventoryValue)}
@@ -62,22 +144,14 @@ export default async function DashboardHomePage() {
           label="Materiales activos"
           value={String(summary.activeMaterialsCount)}
           icon={<Layers strokeWidth={2} />}
-          delay={0.05}
-        />
-        <StatCard
-          label="Ganancia del mes"
-          value={formatMXN(summary.estimatedProfitThisMonth)}
-          icon={<TrendingUp strokeWidth={2} />}
-          variant={summary.estimatedProfitThisMonth >= 0 ? "success" : "warning"}
-          hint="Pagos recibidos este mes"
-          delay={0.1}
+          delay={0.03}
         />
         <StatCard
           label="Pedidos completados"
           value={String(summary.acceptedJobsCount)}
           icon={<ShoppingBag strokeWidth={2} />}
-          hint="Completado + Entregado"
-          delay={0.15}
+          hint="Completado + Entregado (histórico)"
+          delay={0.06}
         />
       </div>
 

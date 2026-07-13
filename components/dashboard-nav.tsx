@@ -20,6 +20,7 @@ import {
   Boxes,
   MoreHorizontal,
   Receipt,
+  LineChart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ const NAV_ITEMS = [
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
   { href: "/calendario", label: "Calendario", icon: Calendar },
   { href: "/gastos", label: "Gastos", icon: Receipt },
+  { href: "/reportes/financiero", label: "Reportes", icon: LineChart },
   { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 
@@ -75,6 +77,7 @@ const MOBILE_MORE_ITEMS = [
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/materiales", label: "Materiales", icon: Layers },
   { href: "/gastos", label: "Gastos", icon: Receipt },
+  { href: "/reportes/financiero", label: "Reportes", icon: LineChart },
   { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 
