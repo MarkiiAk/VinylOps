@@ -6,11 +6,15 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
-const databaseUrl = process.env["DATABASE_URL"];
-
-if (!databaseUrl) {
-  throw new Error("Falta configurar DATABASE_URL (cadena de conexión de Postgres) en las variables de entorno.");
-}
+// OJO: `prisma generate` (corre en postinstall, sin conexión a la base
+// todavía en un deploy nuevo de Vercel) carga este archivo pero NO necesita
+// una DATABASE_URL real — solo lee el schema para generar el cliente. Por
+// eso no se lanza un error aquí si falta: los comandos que sí necesitan
+// conexión real (`migrate deploy`, `migrate dev`, `studio`) fallan solos,
+// con su propio mensaje claro, si la variable no está configurada. Lanzar
+// el error en este archivo tumbaba el build completo (incluyendo
+// `prisma generate`) antes de que Vercel tuviera oportunidad de correr nada.
+const databaseUrl = process.env["DATABASE_URL"] ?? "";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
