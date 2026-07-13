@@ -51,32 +51,51 @@ requisito ("14+") y evita fijar una versión con EOL de soporte más próximo.
 Turbopack viene habilitado por defecto en `next build`/`next dev` en esta
 versión — no se desactivó porque no dio problemas en el build de este scaffold.
 
-### 2. Prisma 7 + SQLite: driver adapters obligatorios
+### 2. Prisma 7 + Postgres: driver adapters obligatorios
 
 Prisma 7 cambió el modelo de configuración respecto a versiones anteriores:
 
 - `datasource.url` **ya no se define en `schema.prisma`**. La URL de conexión
-  vive en `prisma.config.ts` (leída por el CLI: `db push`, `studio`, futuras
-  `migrate`) y se pasa explícitamente al `PrismaClient` en runtime vía un
+  vive en `prisma.config.ts` (leída por el CLI: `db push`, `studio`, `migrate`)
+  y se pasa explícitamente al `PrismaClient` en runtime vía un
   **driver adapter**.
 - El generator por defecto ya no es `prisma-client-js` sino `prisma-client`
   (cliente ESM, con `output` configurable). Se dejó tal cual lo generó
   `prisma init` (`output = "../lib/generated/prisma"`), que es el patrón
   soportado nativamente en esta versión.
-- Para SQLite, el adapter oficial es `@prisma/adapter-better-sqlite3` (usa
-  `better-sqlite3`, un módulo nativo). Se instaló sin problemas en este
-  entorno Windows/Node 22.
+- Para Postgres, el adapter es `@prisma/adapter-pg` (sobre `pg`/node-postgres
+  estándar) — funciona con cualquier Postgres (Vercel/Neon, Supabase, RDS, uno
+  local), no ata el proyecto a un proveedor específico.
+
+**Migrado desde SQLite (2026-07)**: el proyecto arrancó sobre SQLite local
+(`@prisma/adapter-better-sqlite3` + archivo `prisma/dev.db`) porque era
+suficiente para desarrollo 100% local. Al planear el despliegue en Vercel se
+migró a Postgres, porque las funciones serverless de Vercel corren en un
+filesystem efímero — no hay forma de persistir un archivo `.db` entre
+invocaciones. El historial de migraciones SQLite quedó archivado en
+`prisma/migrations_sqlite_archive/` (no se puede aplicar contra Postgres, es
+sintaxis distinta); el historial real para Postgres arranca de un baseline
+único en `prisma/migrations/`.
 
 Esto afecta a quien escriba código de backend sobre este scaffold:
 - El singleton de Prisma Client vive en `lib/db.ts` y ya incluye el adapter
   configurado — importar `prisma` desde ahí, nunca instanciar `PrismaClient`
   directamente en otro archivo.
 - `prisma.config.ts` tiene su propia `datasource.url` (para el CLI) que debe
-  mantenerse en sync con `.env` (`DATABASE_URL`).
-- No hay migraciones (`prisma migrate`) configuradas todavía en esta fase; se
-  usó `prisma db push` para crear `prisma/dev.db` a partir del schema. Cuando
-  el proyecto necesite historial de migraciones versionado, correr
-  `prisma migrate dev` en vez de `db push` a partir de ese punto.
+  mantenerse en sync con `.env` (`DATABASE_URL`) — ambos ahora **requieren**
+  la variable (sin fallback a un archivo local, a diferencia de la etapa
+  SQLite).
+- Scripts que corren fuera del runtime de Next (`prisma/seed.ts`, y cualquier
+  script nuevo bajo `scripts/`) deben importar `"dotenv/config"` de forma
+  explícita como primera línea — Next.js carga `.env` solo para `next dev`/
+  `next build`, `tsx` no lo hace solo.
+- Para desarrollo local sin depender de la base de producción, correr un
+  Postgres local (Docker: `docker run -d --name vinylops-pg -e
+  POSTGRES_USER=vinylops -e POSTGRES_PASSWORD=vinylops -e
+  POSTGRES_DB=vinylops -p 55432:5432 postgres:16-alpine`) o crear un branch
+  de desarrollo separado en el proveedor hosteado (Neon soporta branches
+  gratis) — nunca apuntar `DATABASE_URL` de desarrollo a la base real del
+  negocio en uso.
 
 ### 3. shadcn/ui sobre Base UI, no Radix
 

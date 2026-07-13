@@ -1,48 +1,49 @@
-// Respaldo manual y verificable de la base SQLite (V1, Fase 1).
-//
-// Copia prisma/dev.db a prisma/backups/ con timestamp, y verifica que el
-// archivo resultante sea una base SQLite valida y abrible antes de darlo por
-// bueno. No requiere detener el servidor de dev (SQLite soporta lectura
-// concurrente mientras se copia el archivo, siempre que no haya una
-// transaccion de escritura en curso en ese instante exacto).
+// Respaldo manual de la base Postgres (migrado desde SQLite al pasar a
+// Vercel). Usa `pg_dump` si está disponible en el PATH — genera un archivo
+// .sql portable en prisma/backups/. Si `pg_dump` no está instalado
+// localmente, no falla en silencio: explica que el respaldo real de una
+// base hosteada (Neon/Vercel Postgres/Supabase/etc.) lo da el propio
+// proveedor (point-in-time recovery / snapshots), y ese es el mecanismo
+// principal a usar en producción — este script es un respaldo manual
+// adicional para desarrollo/tranquilidad, no el único.
 
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import "dotenv/config";
+import { existsSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import Database from "better-sqlite3";
+import { execFileSync } from "node:child_process";
+
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.error("Falta DATABASE_URL en las variables de entorno.");
+  process.exit(1);
+}
 
 const root = resolve(import.meta.dirname, "..");
-const dbPath = resolve(root, "prisma/dev.db");
 const backupsDir = resolve(root, "prisma/backups");
-
-if (!existsSync(dbPath)) {
-  console.error(`No se encontró la base de datos en ${dbPath} — nada que respaldar.`);
-  process.exit(1);
-}
-
 mkdirSync(backupsDir, { recursive: true });
 
-const now = new Date();
-const stamp = now.toISOString().replace(/[:.]/g, "-");
-const backupPath = resolve(backupsDir, `dev.db.backup-${stamp}`);
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+const backupPath = resolve(backupsDir, `backup-${stamp}.sql`);
 
-copyFileSync(dbPath, backupPath);
-
-// Verificacion: el respaldo debe abrir como SQLite valido y responder una
-// consulta real, no solo "el archivo existe".
 try {
-  const db = new Database(backupPath, { readonly: true });
-  const integrity = db.pragma("integrity_check", { simple: true });
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-  db.close();
-
-  if (integrity !== "ok") {
-    console.error(`El respaldo se creó pero falló la verificación de integridad: ${integrity}`);
-    process.exit(1);
-  }
-
-  console.log(`Respaldo creado y verificado: ${backupPath}`);
-  console.log(`Tablas encontradas: ${tables.length}`);
+  execFileSync("pg_dump", [databaseUrl, "--no-owner", "--no-privileges", "-f", backupPath], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
 } catch (error) {
-  console.error("El respaldo se copió pero no se pudo abrir/verificar:", error);
+  console.error(
+    "No se encontró `pg_dump` en este equipo (o falló al correrlo), así que no se generó un respaldo local.\n" +
+      "En producción, el respaldo real de una base Postgres hosteada (Neon/Vercel Postgres/Supabase) lo da el " +
+      "propio proveedor: point-in-time recovery / snapshots automáticos desde su dashboard — revísalo ahí antes " +
+      "de una migración importante.\n" +
+      (error?.stderr?.toString() ?? error?.message ?? "")
+  );
   process.exit(1);
 }
+
+if (!existsSync(backupPath)) {
+  console.error("pg_dump corrió pero no se generó el archivo esperado.");
+  process.exit(1);
+}
+
+console.log(`Respaldo creado: ${backupPath}`);

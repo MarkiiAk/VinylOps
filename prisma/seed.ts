@@ -9,6 +9,10 @@
 // el motor debería producir, para que el seed quede consistente si alguien
 // ajusta las reglas de redondeo/complejidad más adelante.
 
+// tsx no carga .env automaticamente (a diferencia de Next.js, que lo hace
+// solo para `next dev`/`next build`) — sin esto, DATABASE_URL llega vacio a
+// lib/db.ts cuando se corre este script standalone (`npm run db:seed`).
+import "dotenv/config";
 import { prisma } from "../lib/db";
 import {
   calculateAreaCm2,

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
 import { archiveMaterial, unarchiveMaterial } from "@/lib/actions/materials";
+import { costPerSheet, hasFixedSheet } from "@/lib/sheet-units";
 import { MaterialFilterBar } from "./material-filter-bar";
 import { MaterialFormDialog } from "./material-form-dialog";
 import { PurchaseForm } from "./purchase-form";
@@ -145,12 +146,23 @@ function CatalogMaterialCard({
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-        <span className="text-muted-foreground">Costo / cm2</span>
-        <span className="text-right tabular-nums text-foreground">
-          {formatMXN(material.weightedAverageCostPerCm2, 4)}
-        </span>
-        <span className="text-muted-foreground">Costo / m2</span>
-        <span className="text-right tabular-nums text-foreground">{formatMXN(material.weightedAverageCostPerM2)}</span>
+        {hasFixedSheet(material) ? (
+          <>
+            <span className="text-muted-foreground">Costo / hoja</span>
+            <span className="text-right tabular-nums text-foreground">
+              {formatMXN(costPerSheet(material.weightedAverageCostPerCm2, material), 2)}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-muted-foreground">Costo / cm2</span>
+            <span className="text-right tabular-nums text-foreground">
+              {formatMXN(material.weightedAverageCostPerCm2, 4)}
+            </span>
+            <span className="text-muted-foreground">Costo / m2</span>
+            <span className="text-right tabular-nums text-foreground">{formatMXN(material.weightedAverageCostPerM2)}</span>
+          </>
+        )}
       </div>
 
       {(material.brand || material.supplierDefault || material.purchaseUrl) && (

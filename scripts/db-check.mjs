@@ -1,40 +1,40 @@
-// Verificacion rapida de salud de la base SQLite (V1, Fase 1).
+// Verificacion rapida de salud de la base Postgres (V1, migrado desde SQLite
+// al pasar a Vercel). Reporta conteo de filas por tabla, para poder
+// confirmar "la conexion funciona y tiene lo que espero" antes/despues de
+// una migracion, sin tener que levantar la app completa.
 //
-// Corre un integrity_check nativo de SQLite + reporta conteo de filas por
-// tabla, para poder confirmar "el archivo abre bien y tiene lo que espero"
-// antes/despues de una migracion, sin tener que levantar la app completa.
+// Nota: Postgres no tiene un "integrity_check" nativo como SQLite (PRAGMA) —
+// la integridad fisica del archivo la garantiza el proveedor (Neon/Vercel/
+// Supabase/etc). Este script se limita a confirmar conectividad + contenido.
 
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import Database from "better-sqlite3";
+import "dotenv/config";
+import pg from "pg";
 
-const root = resolve(import.meta.dirname, "..");
-const dbPath = process.argv[2] ? resolve(process.argv[2]) : resolve(root, "prisma/dev.db");
+const databaseUrl = process.argv[2] ?? process.env.DATABASE_URL;
 
-if (!existsSync(dbPath)) {
-  console.error(`No se encontró ninguna base de datos en ${dbPath}`);
+if (!databaseUrl) {
+  console.error("Falta DATABASE_URL (variable de entorno o argumento).");
   process.exit(1);
 }
 
-const db = new Database(dbPath, { readonly: true });
+const client = new pg.Client({ connectionString: databaseUrl });
 
-const integrity = db.pragma("integrity_check", { simple: true });
-console.log(`Archivo: ${dbPath}`);
-console.log(`Integridad: ${integrity}`);
+try {
+  await client.connect();
+  console.log(`Conectado a: ${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
 
-const tables = db
-  .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-  .all();
+  const { rows: tables } = await client.query(
+    `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`
+  );
 
-console.log(`\nTablas (${tables.length}):`);
-for (const { name } of tables) {
-  const { c } = db.prepare(`SELECT COUNT(*) as c FROM "${name}"`).get();
-  console.log(`  ${name.padEnd(24)} ${c} filas`);
-}
-
-db.close();
-
-if (integrity !== "ok") {
-  console.error("\nADVERTENCIA: la base de datos no pasó el chequeo de integridad.");
+  console.log(`\nTablas (${tables.length}):`);
+  for (const { table_name } of tables) {
+    const { rows } = await client.query(`SELECT COUNT(*) AS c FROM "${table_name}"`);
+    console.log(`  ${table_name.padEnd(24)} ${rows[0].c} filas`);
+  }
+} catch (error) {
+  console.error("No se pudo verificar la base:", error.message);
   process.exit(1);
+} finally {
+  await client.end();
 }

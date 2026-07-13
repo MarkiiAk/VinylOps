@@ -1,5 +1,6 @@
 // VinylOps Pricing Studio — Prisma schema
-// Datasource: SQLite (app privada, single-tenant, sin necesidad de servidor de DB)
+// Datasource: PostgreSQL (migrado desde SQLite para desplegar en Vercel —
+// filesystem serverless efímero, no soporta un archivo SQLite persistente).
 // Generator: prisma-client (ESM client, ver ARCHITECTURE.md para el porqué de esta eleccion sobre prisma-client-js)
 
 generator client {
@@ -8,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Material {

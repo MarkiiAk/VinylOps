@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getMaterial } from "@/lib/actions/materials";
+import { costPerSheet, hasFixedSheet, areaToSheets } from "@/lib/sheet-units";
 import { PurchaseForm } from "../_components/purchase-form";
 import { MaterialFormDialog } from "../_components/material-form-dialog";
 import { MaterialCostChart } from "../_components/material-cost-chart";
@@ -29,6 +30,11 @@ function formatMXN(value: number, maximumFractionDigits = 2) {
 
 function formatM2(cm2: number) {
   return `${(cm2 / 10_000).toFixed(2)} m2`;
+}
+
+function formatSheets(sheets: number) {
+  const rounded = Math.round(sheets * 100) / 100;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(2)} ${rounded === 1 ? "hoja" : "hojas"}`;
 }
 
 function formatDate(date: Date) {
@@ -55,6 +61,7 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
   }
 
   const isLowStock = material.lowStockThresholdCm2 > 0 && material.totalAreaCm2 <= material.lowStockThresholdCm2;
+  const fixedSheet = hasFixedSheet(material);
 
   return (
     <div className="space-y-6">
@@ -95,15 +102,25 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {fixedSheet ? (
+          <StatCard
+            label="Costo / hoja"
+            value={formatMXN(costPerSheet(material.weightedAverageCostPerCm2, material), 2)}
+            icon={<DollarSign />}
+          />
+        ) : (
+          <>
+            <StatCard
+              label="Costo / cm2"
+              value={formatMXN(material.weightedAverageCostPerCm2, 4)}
+              icon={<DollarSign />}
+            />
+            <StatCard label="Costo / m2" value={formatMXN(material.weightedAverageCostPerM2)} icon={<DollarSign />} />
+          </>
+        )}
         <StatCard
-          label="Costo / cm2"
-          value={formatMXN(material.weightedAverageCostPerCm2, 4)}
-          icon={<DollarSign />}
-        />
-        <StatCard label="Costo / m2" value={formatMXN(material.weightedAverageCostPerM2)} icon={<DollarSign />} />
-        <StatCard
-          label="Area disponible"
-          value={formatM2(material.totalAreaCm2)}
+          label={fixedSheet ? "Hojas disponibles" : "Area disponible"}
+          value={fixedSheet ? formatSheets(areaToSheets(material.totalAreaCm2, material)) : formatM2(material.totalAreaCm2)}
           icon={<Ruler />}
           variant={isLowStock ? "warning" : "neutral"}
           hint={isLowStock ? "Por debajo del umbral de stock bajo" : undefined}
@@ -116,6 +133,8 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
         <MaterialCostChart
           purchases={material.purchases}
           currentWeightedAverageCostPerCm2={material.weightedAverageCostPerCm2}
+          sheetWidthCm={material.sheetWidthCm}
+          sheetHeightCm={material.sheetHeightCm}
         />
       </div>
 
@@ -130,12 +149,12 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead>Fecha</TableHead>
                   <TableHead>Proveedor</TableHead>
-                  <TableHead>Dimensiones</TableHead>
-                  <TableHead>Cantidad</TableHead>
+                  {fixedSheet ? null : <TableHead>Dimensiones</TableHead>}
+                  <TableHead>{fixedSheet ? "Hojas" : "Cantidad"}</TableHead>
                   <TableHead>Precio bruto</TableHead>
                   <TableHead>Descuento</TableHead>
                   <TableHead>Precio final</TableHead>
-                  <TableHead className="text-right">Costo / cm2</TableHead>
+                  <TableHead className="text-right">{fixedSheet ? "Costo / hoja" : "Costo / cm2"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -143,9 +162,11 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                   <TableRow key={purchase.id} className="border-border">
                     <TableCell className="text-muted-foreground">{formatDate(purchase.purchaseDate)}</TableCell>
                     <TableCell className="text-muted-foreground">{purchase.supplier ?? "—"}</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
-                      {purchase.widthCm} x {purchase.heightCm} cm
-                    </TableCell>
+                    {fixedSheet ? null : (
+                      <TableCell className="tabular-nums text-muted-foreground">
+                        {purchase.widthCm} x {purchase.heightCm} cm
+                      </TableCell>
+                    )}
                     <TableCell className="tabular-nums text-muted-foreground">{purchase.quantity}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
                       {formatMXN(purchase.grossPrice)}
@@ -157,7 +178,7 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                       {formatMXN(purchase.finalPrice)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-foreground">
-                      {formatMXN(purchase.costPerCm2, 4)}
+                      {fixedSheet ? formatMXN(costPerSheet(purchase.costPerCm2, material), 2) : formatMXN(purchase.costPerCm2, 4)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -182,7 +203,7 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead>Pedido</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Area declarada</TableHead>
+                  <TableHead>{fixedSheet ? "Hojas declaradas" : "Area declarada"}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -193,7 +214,11 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                       <OrderStatusBadge status={usage.order.status} />
                     </TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
-                      {usage.otherMaterialAreaCm2 !== null ? formatM2(usage.otherMaterialAreaCm2) : "—"}
+                      {usage.otherMaterialAreaCm2 === null
+                        ? "—"
+                        : fixedSheet
+                          ? formatSheets(areaToSheets(usage.otherMaterialAreaCm2, material))
+                          : formatM2(usage.otherMaterialAreaCm2)}
                     </TableCell>
                   </TableRow>
                 ))}

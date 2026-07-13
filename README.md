@@ -6,7 +6,12 @@ Herramienta interna de **By Lilo Studio** (negocio real de vinil/Cricut/DTF) par
 
 ```bash
 npm install
-npm run db:seed   # crea prisma/dev.db con datos de ejemplo (idempotente)
+# Necesitas un Postgres corriendo y DATABASE_URL configurado en .env (ver .env.example).
+# Para desarrollo local sin depender de la base real: docker run -d --name vinylops-pg \
+#   -e POSTGRES_USER=vinylops -e POSTGRES_PASSWORD=vinylops -e POSTGRES_DB=vinylops \
+#   -p 55432:5432 postgres:16-alpine
+npx prisma migrate dev
+npm run db:seed   # datos de ejemplo (idempotente) — NUNCA correr contra la base real del negocio
 npm run dev
 ```
 
@@ -23,7 +28,7 @@ Abre [http://localhost:3000](http://localhost:3000).
 
 ## Stack y decisiones técnicas
 
-Ver [ARCHITECTURE.md](./ARCHITECTURE.md) para el detalle de por qué se eligió cada pieza del stack (Next.js 16 + Prisma 7 + SQLite + Tailwind v4 + shadcn/ui sobre Base UI) y las particularidades de cada una (driver adapters de Prisma 7, PWA manual sin `next-pwa`, etc.).
+Ver [ARCHITECTURE.md](./ARCHITECTURE.md) para el detalle de por qué se eligió cada pieza del stack (Next.js 16 + Prisma 7 + Postgres + Tailwind v4 + shadcn/ui sobre Base UI) y las particularidades de cada una (driver adapters de Prisma 7, PWA manual sin `next-pwa`, etc.).
 
 ## Pendientes conocidos
 

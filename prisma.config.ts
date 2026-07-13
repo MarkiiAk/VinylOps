@@ -2,11 +2,15 @@
 // Prisma 7 separa la configuracion de conexion del schema.prisma: el CLI (db push,
 // migrate, studio) lee `datasource.url` de este archivo. El runtime de la app usa
 // el driver adapter definido en lib/db.ts. Ver ARCHITECTURE.md, seccion
-// "Prisma 7 + SQLite".
+// "Prisma 7 + Postgres".
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
-const databaseUrl = process.env["DATABASE_URL"] ?? "file:./prisma/dev.db";
+const databaseUrl = process.env["DATABASE_URL"];
+
+if (!databaseUrl) {
+  throw new Error("Falta configurar DATABASE_URL (cadena de conexión de Postgres) en las variables de entorno.");
+}
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

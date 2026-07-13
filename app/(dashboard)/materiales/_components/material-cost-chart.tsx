@@ -1,6 +1,7 @@
 "use client";
 
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
+import { costPerSheet, hasFixedSheet, type SheetDimensions } from "@/lib/sheet-units";
 
 interface PurchasePoint {
   id: string;
@@ -8,16 +9,16 @@ interface PurchasePoint {
   costPerCm2: number;
 }
 
-interface MaterialCostChartProps {
+interface MaterialCostChartProps extends SheetDimensions {
   purchases: PurchasePoint[];
   currentWeightedAverageCostPerCm2: number;
 }
 
-function formatMXN4(value: number) {
+function formatMXN(value: number, maximumFractionDigits = 2) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: "MXN",
-    maximumFractionDigits: 4,
+    maximumFractionDigits,
   }).format(value);
 }
 
@@ -29,13 +30,23 @@ function formatMXN4(value: number) {
  * "promedio ponderado vigente" es el estado actual del material, no un punto
  * historico mas.
  */
-export function MaterialCostChart({ purchases, currentWeightedAverageCostPerCm2 }: MaterialCostChartProps) {
+export function MaterialCostChart({
+  purchases,
+  currentWeightedAverageCostPerCm2,
+  sheetWidthCm,
+  sheetHeightCm,
+}: MaterialCostChartProps) {
+  const fixedSheet = hasFixedSheet({ sheetWidthCm, sheetHeightCm });
+  const toDisplayCost = (costPerCm2: number) =>
+    fixedSheet ? costPerSheet(costPerCm2, { sheetWidthCm, sheetHeightCm }) : costPerCm2;
+  const displayDigits = fixedSheet ? 2 : 4;
+
   const data = [...purchases]
     .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime())
     .map((p, idx) => ({
       index: idx + 1,
       date: new Date(p.purchaseDate).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }),
-      costPerCm2: p.costPerCm2,
+      cost: toDisplayCost(p.costPerCm2),
     }));
 
   if (data.length === 0) {
@@ -58,7 +69,7 @@ export function MaterialCostChart({ purchases, currentWeightedAverageCostPerCm2 
               fontSize={11}
               tickLine={false}
               width={70}
-              tickFormatter={(v: number) => formatMXN4(v)}
+              tickFormatter={(v: number) => formatMXN(v, displayDigits)}
             />
             <Tooltip
               contentStyle={{
@@ -67,11 +78,14 @@ export function MaterialCostChart({ purchases, currentWeightedAverageCostPerCm2 
                 borderRadius: "0.5rem",
                 fontSize: "0.75rem",
               }}
-              formatter={(value) => [formatMXN4(Number(value)), "Costo / cm2 de esta compra"]}
+              formatter={(value) => [
+                formatMXN(Number(value), displayDigits),
+                fixedSheet ? "Costo / hoja de esta compra" : "Costo / cm2 de esta compra",
+              ]}
             />
             <Line
               type="monotone"
-              dataKey="costPerCm2"
+              dataKey="cost"
               stroke="var(--color-neon-cyan)"
               strokeWidth={2}
               dot={{ r: 3 }}
@@ -81,9 +95,12 @@ export function MaterialCostChart({ purchases, currentWeightedAverageCostPerCm2 
         </ResponsiveContainer>
       </div>
       <p className="text-[0.7rem] text-muted-foreground">
-        Cada punto es el costo/cm2 de una compra individual, no el promedio acumulado. El promedio ponderado
-        vigente del material (estado actual, no historico) es{" "}
-        <span className="font-medium text-foreground">{formatMXN4(currentWeightedAverageCostPerCm2)}</span> por cm2.
+        Cada punto es el costo {fixedSheet ? "por hoja" : "/cm2"} de una compra individual, no el promedio
+        acumulado. El promedio ponderado vigente del material (estado actual, no historico) es{" "}
+        <span className="font-medium text-foreground">
+          {formatMXN(toDisplayCost(currentWeightedAverageCostPerCm2), displayDigits)}
+        </span>{" "}
+        {fixedSheet ? "por hoja." : "por cm2."}
       </p>
     </div>
   );

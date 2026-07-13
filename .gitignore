@@ -43,7 +43,8 @@ next-env.d.ts
 
 /lib/generated/prisma
 
-# database (SQLite dev db, no se versiona)
+# database (respaldos locales de Postgres, ver scripts/db-backup.mjs; y
+# archivo SQLite legado por si alguien todavia tiene uno en local)
 /prisma/*.db
 /prisma/*.db-journal
 /prisma/backups/
