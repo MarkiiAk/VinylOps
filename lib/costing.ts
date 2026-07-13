@@ -133,6 +133,60 @@ export function computeKitSavings(kitPrice: number, components: KitComponentLike
   return { equivalentPrice, savingsAbsolute, savingsPercentage }
 }
 
+export interface KitComponentCosts {
+  materialCostPerUnit: number
+  inkCostPerUnit: number
+  electricityCostPerUnit: number
+  wearCostPerUnit: number
+  wasteCostPerUnit: number
+  laborCostPerUnit: number
+}
+
+export interface KitCostComponent {
+  quantity: number
+  componentItem: KitComponentCosts
+}
+
+/**
+ * Costos de un kit (material/tinta/luz/desgaste/merma/mano de obra),
+ * DERIVADOS sumando esos mismos campos de cada componente * su cantidad en
+ * el kit — regla de negocio explícita: "si mañana cambia el costo de un
+ * producto, el kit debe recalcularse automáticamente a partir de su
+ * receta", nunca duplicar esos valores a mano en el propio kit. bolsa/
+ * etiquetita NO se derivan aquí: son costos propios del kit (una bolsa y
+ * una etiquetita compartidas, no una por componente) — ver
+ * bagCostPerUnit/labelCostPerUnit en CatalogItem.
+ */
+export function deriveKitCosts(components: KitCostComponent[]): KitComponentCosts {
+  const totals = components.reduce(
+    (acc, c) => ({
+      materialCostPerUnit: acc.materialCostPerUnit + c.componentItem.materialCostPerUnit * c.quantity,
+      inkCostPerUnit: acc.inkCostPerUnit + c.componentItem.inkCostPerUnit * c.quantity,
+      electricityCostPerUnit: acc.electricityCostPerUnit + c.componentItem.electricityCostPerUnit * c.quantity,
+      wearCostPerUnit: acc.wearCostPerUnit + c.componentItem.wearCostPerUnit * c.quantity,
+      wasteCostPerUnit: acc.wasteCostPerUnit + c.componentItem.wasteCostPerUnit * c.quantity,
+      laborCostPerUnit: acc.laborCostPerUnit + c.componentItem.laborCostPerUnit * c.quantity,
+    }),
+    {
+      materialCostPerUnit: 0,
+      inkCostPerUnit: 0,
+      electricityCostPerUnit: 0,
+      wearCostPerUnit: 0,
+      wasteCostPerUnit: 0,
+      laborCostPerUnit: 0,
+    }
+  )
+
+  return {
+    materialCostPerUnit: roundForStorage(totals.materialCostPerUnit),
+    inkCostPerUnit: roundForStorage(totals.inkCostPerUnit),
+    electricityCostPerUnit: roundForStorage(totals.electricityCostPerUnit),
+    wearCostPerUnit: roundForStorage(totals.wearCostPerUnit),
+    wasteCostPerUnit: roundForStorage(totals.wasteCostPerUnit),
+    laborCostPerUnit: roundForStorage(totals.laborCostPerUnit),
+  }
+}
+
 export interface MaterialRecipeLine {
   materialId: string
   areaCm2PerUnit: number

@@ -23,7 +23,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@/lib/generated/prisma/client'
-import { computeLineSnapshot } from '@/lib/costing'
+import { computeLineSnapshot, deriveKitCosts } from '@/lib/costing'
 
 export interface QuoteLineItemInput {
   catalogItemId?: string
@@ -113,7 +113,7 @@ export async function createOrder(input: CreateOrderInput) {
   const catalogItems = catalogItemIds.length
     ? await prisma.catalogItem.findMany({
         where: { id: { in: catalogItemIds } },
-        include: { materials: { include: { material: true } } },
+        include: { kitComponents: { include: { componentItem: true } } },
       })
     : []
   const catalogItemMap = new Map(catalogItems.map((item) => [item.id, item]))
@@ -152,19 +152,21 @@ export async function createOrder(input: CreateOrderInput) {
     }
 
     if (catalogItem) {
-      const unitMaterialCost = catalogItem.materials.reduce(
-        (sum, m) => sum + m.areaCm2PerUnit * m.material.weightedAverageCostPerCm2,
-        0
-      )
+      // Regla de negocio: material/tinta/luz/desgaste/merma/mano de obra se
+      // capturan directo en el catálogo (NO se derivan del costo de
+      // inventario) — salvo que sea un kit, donde se derivan sumando esos
+      // mismos campos de cada componente * su cantidad (ver deriveKitCosts).
+      // bolsa/etiquetita siempre son propias del item (compartidas en kits).
+      const derived = catalogItem.isKit ? deriveKitCosts(catalogItem.kitComponents) : null
       unitCosts = {
-        unitMaterialCost,
-        unitInkCost: catalogItem.inkCostPerUnit,
-        unitElectricityCost: catalogItem.electricityCostPerUnit,
-        unitWearCost: catalogItem.wearCostPerUnit,
-        unitWasteCost: catalogItem.wasteCostPerUnit,
+        unitMaterialCost: derived ? derived.materialCostPerUnit : catalogItem.materialCostPerUnit,
+        unitInkCost: derived ? derived.inkCostPerUnit : catalogItem.inkCostPerUnit,
+        unitElectricityCost: derived ? derived.electricityCostPerUnit : catalogItem.electricityCostPerUnit,
+        unitWearCost: derived ? derived.wearCostPerUnit : catalogItem.wearCostPerUnit,
+        unitWasteCost: derived ? derived.wasteCostPerUnit : catalogItem.wasteCostPerUnit,
         unitBagCost: catalogItem.bagCostPerUnit,
         unitLabelCost: catalogItem.labelCostPerUnit,
-        estimatedUnitLabor: catalogItem.laborCostPerUnit,
+        estimatedUnitLabor: derived ? derived.laborCostPerUnit : catalogItem.laborCostPerUnit,
       }
     } else {
       const otherMaterial = line.otherMaterialId ? otherMaterialMap.get(line.otherMaterialId) : undefined

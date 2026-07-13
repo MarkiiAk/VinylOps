@@ -172,16 +172,32 @@ model InventoryConsumption {
 // FASE 2 (V1, modelo financiero): otherCostPerUnit queda como campo LEGADO
 // (mezclaba tinta + luz + tiempo del dueño, sin poder separarse sin inventar
 // datos financieros) — se conserva su valor histórico intacto pero deja de
-// usarse en los cálculos nuevos. Los 7 campos granulares de abajo son la
-// fuente de verdad de costo unitario en V1 y arrancan en 0: deben llenarse
-// manualmente desde /catalogo para cada producto (no se derivan
-// automáticamente de otherCostPerUnit).
+// usarse en los cálculos nuevos. Los 8 campos granulares de abajo (incluye
+// materialCostPerUnit) son la fuente de verdad de costo unitario en V1.
+//
+// REGLAS DE NEGOCIO (2026-07, dictadas por el dueño — fuente de verdad,
+// ver V1_IMPLEMENTATION_REPORT.md): materialCostPerUnit es un valor QUE SE
+// CAPTURA DIRECTO, igual que tinta/luz/desgaste/merma/mano de obra — NO se
+// deriva del costo ponderado de inventario (weightedAverageCostPerCm2). La
+// receta de materiales (`materials`/CatalogItemMaterial) sigue existiendo
+// SOLO para el consumo/descuento de inventario real al completar un pedido;
+// es un concepto separado del costeo de venta.
+//
+// Para un KIT (isKit=true): materialCostPerUnit, inkCostPerUnit,
+// electricityCostPerUnit, wearCostPerUnit, wasteCostPerUnit y
+// laborCostPerUnit de ESTE registro NO se usan — se derivan en vivo sumando
+// esos mismos campos de cada componente (kitComponents) * su cantidad en el
+// kit (ver deriveKitCosts en lib/costing.ts), para nunca duplicar
+// información ni quedar desactualizados si cambia el costo de un producto.
+// bagCostPerUnit/labelCostPerUnit SÍ son propios del kit (una bolsa y una
+// etiquetita compartidas, no una por componente).
 model CatalogItem {
   id                     String   @id @default(cuid())
   name                   String
   isKit                  Boolean  @default(false)
   unitPrice              Float
   otherCostPerUnit       Float    @default(0) // LEGADO: ver nota arriba, ya no se usa en calculos nuevos
+  materialCostPerUnit    Float    @default(0) // material (capturado directo, no derivado de inventario)
   inkCostPerUnit         Float    @default(0) // tinta
   electricityCostPerUnit Float    @default(0) // luz
   wearCostPerUnit        Float    @default(0) // desgaste de maquina/herramienta

@@ -15,7 +15,13 @@
 
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
-import { computeKitSavings, computeUnitDirectCost, deriveKitMaterialRecipe, roundForStorage } from '@/lib/costing'
+import {
+  computeKitSavings,
+  computeUnitDirectCost,
+  deriveKitCosts,
+  deriveKitMaterialRecipe,
+  roundForStorage,
+} from '@/lib/costing'
 
 export interface SellCatalogItemInput {
   catalogItemId: string
@@ -31,8 +37,11 @@ export interface CatalogRecipeLineInput {
 
 // FASE 2 (V1): costos granulares por unidad. otherCostPerUnit se sigue
 // aceptando (compatibilidad hacia atrás) pero es LEGADO — ver nota en
-// schema.prisma. Los 7 campos de abajo son la fuente de verdad de V1.
+// schema.prisma. Los 8 campos de abajo son la fuente de verdad de V1.
+// materialCostPerUnit se captura DIRECTO (no se deriva de la receta de
+// inventario) — regla de negocio explícita del dueño, ver schema.prisma.
 export interface GranularCostInput {
+  materialCostPerUnit?: number
   inkCostPerUnit?: number
   electricityCostPerUnit?: number
   wearCostPerUnit?: number
@@ -62,6 +71,7 @@ export interface UpdateCatalogItemInput extends GranularCostInput {
 }
 
 const GRANULAR_COST_FIELDS = [
+  'materialCostPerUnit',
   'inkCostPerUnit',
   'electricityCostPerUnit',
   'wearCostPerUnit',
@@ -90,12 +100,9 @@ function validateCatalogItemInput(data: { name?: string; unitPrice?: number; oth
   }
 }
 
-/** Costo de material por unidad = suma de areaCm2PerUnit * costo vigente de cada material de la receta. */
-function computeMaterialCostPerUnit(materials: { areaCm2PerUnit: number; material: { weightedAverageCostPerCm2: number } }[]) {
-  return materials.reduce((sum, line) => sum + line.areaCm2PerUnit * line.material.weightedAverageCostPerCm2, 0)
-}
-
 type CatalogItemCostFields = {
+  isKit: boolean
+  materialCostPerUnit: number
   inkCostPerUnit: number
   electricityCostPerUnit: number
   wearCostPerUnit: number
@@ -106,29 +113,66 @@ type CatalogItemCostFields = {
   unitPrice: number
 }
 
-/** Desglose financiero completo de un item de catálogo, calculado al vuelo (no persistido) con el costo vigente. */
-function computeCatalogItemFinancials(
-  item: CatalogItemCostFields,
-  materials: { areaCm2PerUnit: number; material: { weightedAverageCostPerCm2: number } }[]
-) {
-  const unitMaterialCost = computeMaterialCostPerUnit(materials)
+type KitComponentForCost = {
+  quantity: number
+  componentItem: {
+    materialCostPerUnit: number
+    inkCostPerUnit: number
+    electricityCostPerUnit: number
+    wearCostPerUnit: number
+    wasteCostPerUnit: number
+    laborCostPerUnit: number
+  }
+}
+
+/**
+ * Desglose financiero completo de un item de catálogo, calculado al vuelo
+ * (no persistido). Si es un kit, material/tinta/luz/desgaste/merma/mano de
+ * obra se DERIVAN sumando esos campos de cada componente * su cantidad
+ * (regla de negocio: nunca duplicar esos valores a mano en el kit) —
+ * bagCostPerUnit/labelCostPerUnit del propio kit sí se usan tal cual
+ * (compartidos, una vez). Si NO es kit, todos los 8 campos vienen
+ * directamente del propio CatalogItem (capturados a mano, no derivados de
+ * inventario).
+ */
+function computeCatalogItemFinancials(item: CatalogItemCostFields, kitComponents: KitComponentForCost[]) {
+  const derived = item.isKit ? deriveKitCosts(kitComponents) : null
+  const costs = derived
+    ? { ...derived, unitBagCost: item.bagCostPerUnit, unitLabelCost: item.labelCostPerUnit }
+    : {
+        materialCostPerUnit: item.materialCostPerUnit,
+        inkCostPerUnit: item.inkCostPerUnit,
+        electricityCostPerUnit: item.electricityCostPerUnit,
+        wearCostPerUnit: item.wearCostPerUnit,
+        wasteCostPerUnit: item.wasteCostPerUnit,
+        unitBagCost: item.bagCostPerUnit,
+        unitLabelCost: item.labelCostPerUnit,
+      }
+
+  const laborCostPerUnit = derived ? derived.laborCostPerUnit : item.laborCostPerUnit
+
   const unitDirectCost = computeUnitDirectCost({
-    unitMaterialCost,
-    unitInkCost: item.inkCostPerUnit,
-    unitElectricityCost: item.electricityCostPerUnit,
-    unitWearCost: item.wearCostPerUnit,
-    unitWasteCost: item.wasteCostPerUnit,
-    unitBagCost: item.bagCostPerUnit,
-    unitLabelCost: item.labelCostPerUnit,
+    unitMaterialCost: costs.materialCostPerUnit,
+    unitInkCost: costs.inkCostPerUnit,
+    unitElectricityCost: costs.electricityCostPerUnit,
+    unitWearCost: costs.wearCostPerUnit,
+    unitWasteCost: costs.wasteCostPerUnit,
+    unitBagCost: costs.unitBagCost,
+    unitLabelCost: costs.unitLabelCost,
   })
 
   const grossProfit = roundForStorage(item.unitPrice - unitDirectCost)
   const grossMargin = item.unitPrice ? roundForStorage(grossProfit / item.unitPrice) : 0
-  const profitAfterLabor = roundForStorage(grossProfit - item.laborCostPerUnit)
+  const profitAfterLabor = roundForStorage(grossProfit - laborCostPerUnit)
   const marginAfterLabor = item.unitPrice ? roundForStorage(profitAfterLabor / item.unitPrice) : 0
 
   return {
-    unitMaterialCost: roundForStorage(unitMaterialCost),
+    unitMaterialCost: roundForStorage(costs.materialCostPerUnit),
+    effectiveInkCostPerUnit: roundForStorage(costs.inkCostPerUnit),
+    effectiveElectricityCostPerUnit: roundForStorage(costs.electricityCostPerUnit),
+    effectiveWearCostPerUnit: roundForStorage(costs.wearCostPerUnit),
+    effectiveWasteCostPerUnit: roundForStorage(costs.wasteCostPerUnit),
+    effectiveLaborCostPerUnit: roundForStorage(laborCostPerUnit),
     unitDirectCost,
     grossProfit,
     grossMargin,
@@ -160,7 +204,7 @@ export async function listCatalogItems(opts: { includeArchived?: boolean } = {})
 
   return items.map((item) => ({
     ...item,
-    ...computeCatalogItemFinancials(item, item.materials),
+    ...computeCatalogItemFinancials(item, item.kitComponents),
     kitSavings: item.isKit ? computeKitSavings(item.unitPrice, item.kitComponents) : null,
   }))
 }
@@ -183,7 +227,7 @@ export async function getCatalogItem(id: string) {
     costPerUnit: line.areaCm2PerUnit * line.material.weightedAverageCostPerCm2,
   }))
 
-  const financials = computeCatalogItemFinancials(item, item.materials)
+  const financials = computeCatalogItemFinancials(item, item.kitComponents)
   const kitSavings = item.isKit ? computeKitSavings(item.unitPrice, item.kitComponents) : null
 
   return {
@@ -299,6 +343,7 @@ export async function createCatalogItem(data: CreateCatalogItemInput) {
         isKit: data.isKit ?? false,
         unitPrice: data.unitPrice,
         otherCostPerUnit: data.otherCostPerUnit ?? 0,
+        materialCostPerUnit: data.materialCostPerUnit ?? 0,
         inkCostPerUnit: data.inkCostPerUnit ?? 0,
         electricityCostPerUnit: data.electricityCostPerUnit ?? 0,
         wearCostPerUnit: data.wearCostPerUnit ?? 0,
@@ -345,6 +390,7 @@ export async function updateCatalogItem(id: string, data: UpdateCatalogItemInput
         ...(data.isKit !== undefined ? { isKit: data.isKit } : {}),
         ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
         ...(data.otherCostPerUnit !== undefined ? { otherCostPerUnit: data.otherCostPerUnit } : {}),
+        ...(data.materialCostPerUnit !== undefined ? { materialCostPerUnit: data.materialCostPerUnit } : {}),
         ...(data.inkCostPerUnit !== undefined ? { inkCostPerUnit: data.inkCostPerUnit } : {}),
         ...(data.electricityCostPerUnit !== undefined ? { electricityCostPerUnit: data.electricityCostPerUnit } : {}),
         ...(data.wearCostPerUnit !== undefined ? { wearCostPerUnit: data.wearCostPerUnit } : {}),

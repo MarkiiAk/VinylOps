@@ -20,6 +20,7 @@ export interface CatalogItemRow {
   isActive: boolean;
   unitPrice: number;
   otherCostPerUnit: number;
+  materialCostPerUnit: number;
   inkCostPerUnit: number;
   electricityCostPerUnit: number;
   wearCostPerUnit: number;
@@ -254,6 +255,7 @@ export function CatalogListClient({
                       isKit: item.isKit,
                       unitPrice: item.unitPrice,
                       otherCostPerUnit: item.otherCostPerUnit,
+                      materialCostPerUnit: item.materialCostPerUnit,
                       inkCostPerUnit: item.inkCostPerUnit,
                       electricityCostPerUnit: item.electricityCostPerUnit,
                       wearCostPerUnit: item.wearCostPerUnit,

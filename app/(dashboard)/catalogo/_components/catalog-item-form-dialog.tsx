@@ -48,6 +48,7 @@ export interface CatalogItemFormValues {
   isKit: boolean;
   unitPrice: number;
   otherCostPerUnit: number;
+  materialCostPerUnit: number;
   inkCostPerUnit: number;
   electricityCostPerUnit: number;
   wearCostPerUnit: number;
@@ -104,6 +105,7 @@ const emptyForm = {
   isKit: false,
   unitPrice: "",
   otherCostPerUnit: "0",
+  materialCostPerUnit: "0",
   inkCostPerUnit: "0",
   electricityCostPerUnit: "0",
   wearCostPerUnit: "0",
@@ -162,6 +164,7 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
         isKit: item.isKit,
         unitPrice: String(item.unitPrice),
         otherCostPerUnit: String(item.otherCostPerUnit),
+        materialCostPerUnit: String(item.materialCostPerUnit),
         inkCostPerUnit: String(item.inkCostPerUnit),
         electricityCostPerUnit: String(item.electricityCostPerUnit),
         wearCostPerUnit: String(item.wearCostPerUnit),
@@ -257,6 +260,7 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
       const unitPrice = Number(form.unitPrice) || 0;
       const costFields = {
         otherCostPerUnit: Number(form.otherCostPerUnit) || 0,
+        materialCostPerUnit: Number(form.materialCostPerUnit) || 0,
         inkCostPerUnit: Number(form.inkCostPerUnit) || 0,
         electricityCostPerUnit: Number(form.electricityCostPerUnit) || 0,
         wearCostPerUnit: Number(form.wearCostPerUnit) || 0,
@@ -397,16 +401,27 @@ export function CatalogItemFormDialog({ materials, componentOptions = [], item, 
 
             <div className="space-y-3 rounded-lg border border-input p-3">
               <Label>Costos por unidad (desglose)</Label>
+              {form.isKit ? (
+                <p className="text-xs text-muted-foreground">
+                  Material, tinta, luz, desgaste, merma y mano de obra se calculan solos sumando los componentes del
+                  kit (abajo) — aquí solo se captura la bolsa y la etiquetita, compartidas una vez por kit.
+                </p>
+              ) : null}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {(
                   [
-                    ["inkCostPerUnit", "Tinta"],
-                    ["electricityCostPerUnit", "Luz"],
-                    ["wearCostPerUnit", "Desgaste"],
-                    ["wasteCostPerUnit", "Merma"],
-                    ["bagCostPerUnit", form.isKit ? "Bolsa (kit)" : "Bolsa"],
-                    ["labelCostPerUnit", form.isKit ? "Etiquetita (kit)" : "Etiquetita"],
-                    ["laborCostPerUnit", "Mano de obra"],
+                    ...(form.isKit
+                      ? ([] as const)
+                      : ([
+                          ["materialCostPerUnit", "Material"],
+                          ["inkCostPerUnit", "Tinta"],
+                          ["electricityCostPerUnit", "Luz"],
+                          ["wearCostPerUnit", "Desgaste"],
+                          ["wasteCostPerUnit", "Merma"],
+                          ["laborCostPerUnit", "Mano de obra"],
+                        ] as const)),
+                    ["bagCostPerUnit", form.isKit ? "Bolsa (kit, compartida)" : "Bolsa"],
+                    ["labelCostPerUnit", form.isKit ? "Etiquetita (kit, compartida)" : "Etiquetita"],
                   ] as const
                 ).map(([field, label]) => (
                   <div key={field} className="space-y-1.5">

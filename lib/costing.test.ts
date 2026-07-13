@@ -3,6 +3,7 @@ import {
   computeKitSavings,
   computeLineSnapshot,
   computeUnitDirectCost,
+  deriveKitCosts,
   deriveKitMaterialRecipe,
 } from './costing'
 
@@ -173,44 +174,79 @@ describe('kits: empaque compartido y ahorro', () => {
     expect(snapshot.unitDirectCost).toBe(14) // 10+3+1, no se multiplica por componentes
   })
 
-  it('Kit Básico: precio equivalente y ahorro con los componentes reales', () => {
-    // 3 cuadernos + 2 lápices + 1 útiles ($39 c/u) + 0.5 DTF textil ($99) + 0.5 DTF UV ($129)
+  it('Kit Básico: precio equivalente y ahorro con los componentes y precios reales (2026-07)', () => {
+    // 3 cuadernos + 2 lápices + 1 útiles ($39 c/u) + 0.5 DTF textil ($99) + 0.5 DTF UV ($119)
     const components = [
       { quantity: 3, componentItem: { unitPrice: 39 } },
       { quantity: 2, componentItem: { unitPrice: 39 } },
       { quantity: 1, componentItem: { unitPrice: 39 } },
       { quantity: 0.5, componentItem: { unitPrice: 99 } },
-      { quantity: 0.5, componentItem: { unitPrice: 129 } },
+      { quantity: 0.5, componentItem: { unitPrice: 119 } },
     ]
     const savings = computeKitSavings(349, components)
 
-    // OJO: con el precio actual ($349) y estos componentes, el Kit Básico
-    // NO es más barato que comprar todo por separado ($348) — el "ahorro"
-    // da -$1. Esto es un hallazgo real de negocio (ver
-    // V1_IMPLEMENTATION_REPORT.md), no un error de la fórmula: se deja el
-    // test fiel al dato actual en vez de forzar un resultado "bonito".
-    expect(savings.equivalentPrice).toBeCloseTo(6 * 39 + 0.5 * 99 + 0.5 * 129, 6)
+    // OJO: con los precios oficiales (2026-07) el Kit Básico NO es más
+    // barato que comprar todo por separado ($343) — el "ahorro" da -$6.
+    // Esto es un hallazgo real de negocio (ver V1_IMPLEMENTATION_REPORT.md),
+    // no un error de la fórmula: se deja el test fiel al dato oficial en vez
+    // de forzar un resultado "bonito".
+    expect(savings.equivalentPrice).toBeCloseTo(6 * 39 + 0.5 * 99 + 0.5 * 119, 6)
     expect(savings.savingsAbsolute).toBeCloseTo(savings.equivalentPrice - 349, 6)
-    expect(savings.savingsAbsolute).toBeCloseTo(-1, 6)
+    expect(savings.savingsAbsolute).toBeCloseTo(-6, 6)
   })
 
-  it('Kit Premium: precio equivalente y ahorro con los componentes reales', () => {
-    // 4 cuadernos + 3 lápices + 1 útiles + 1 silueta ($39 c/u) + 1 DTF textil ($99)
-    // + 1 DTF UV ($129) + 1 identificador rectangular ($79)
+  it('Kit Premium: precio equivalente y ahorro con los componentes y precios reales (2026-07)', () => {
+    // 4 cuadernos + 3 lápices + 1 útiles ($39 c/u) + 1 silueta ($49) + 1 DTF
+    // textil ($99) + 1 DTF UV ($119) + 1 identificador rectangular una cara ($79)
     const components = [
       { quantity: 4, componentItem: { unitPrice: 39 } },
       { quantity: 3, componentItem: { unitPrice: 39 } },
       { quantity: 1, componentItem: { unitPrice: 39 } },
-      { quantity: 1, componentItem: { unitPrice: 39 } },
+      { quantity: 1, componentItem: { unitPrice: 49 } },
       { quantity: 1, componentItem: { unitPrice: 99 } },
-      { quantity: 1, componentItem: { unitPrice: 129 } },
+      { quantity: 1, componentItem: { unitPrice: 119 } },
       { quantity: 1, componentItem: { unitPrice: 79 } },
     ]
     const savings = computeKitSavings(449, components)
 
-    expect(savings.equivalentPrice).toBeCloseTo(9 * 39 + 99 + 129 + 79, 6)
+    expect(savings.equivalentPrice).toBeCloseTo(8 * 39 + 49 + 99 + 119 + 79, 6)
     expect(savings.savingsAbsolute).toBeCloseTo(savings.equivalentPrice - 449, 6)
     expect(savings.savingsAbsolute).toBeGreaterThan(0)
+  })
+
+  it('deriveKitCosts: Kit Básico deriva material/tinta/luz/desgaste/merma/mano de obra oficiales (2026-07)', () => {
+    const cuadernos = { materialCostPerUnit: 3.84, inkCostPerUnit: 1, electricityCostPerUnit: 0.25, wearCostPerUnit: 1, wasteCostPerUnit: 0.75, laborCostPerUnit: 4 }
+    const lapices = cuadernos
+    const utiles = cuadernos
+    const textiles = { materialCostPerUnit: 17.5, inkCostPerUnit: 0, electricityCostPerUnit: 0, wearCostPerUnit: 0, wasteCostPerUnit: 1, laborCostPerUnit: 4 }
+    const agua = { materialCostPerUnit: 35, inkCostPerUnit: 0, electricityCostPerUnit: 0, wearCostPerUnit: 0, wasteCostPerUnit: 1, laborCostPerUnit: 4 }
+
+    const derived = deriveKitCosts([
+      { quantity: 3, componentItem: cuadernos },
+      { quantity: 2, componentItem: lapices },
+      { quantity: 1, componentItem: utiles },
+      { quantity: 0.5, componentItem: textiles },
+      { quantity: 0.5, componentItem: agua },
+    ])
+
+    expect(derived.materialCostPerUnit).toBeCloseTo(3.84 * 6 + 17.5 * 0.5 + 35 * 0.5, 6)
+    expect(derived.inkCostPerUnit).toBeCloseTo(6, 6)
+    expect(derived.electricityCostPerUnit).toBeCloseTo(1.5, 6)
+    expect(derived.wearCostPerUnit).toBeCloseTo(6, 6)
+    expect(derived.wasteCostPerUnit).toBeCloseTo(5.5, 6)
+    expect(derived.laborCostPerUnit).toBeCloseTo(28, 6)
+
+    // Costo directo del kit = derivado + bolsa (0.49) + etiquetita (0.21) propias del kit.
+    const unitDirectCost = computeUnitDirectCost({
+      unitMaterialCost: derived.materialCostPerUnit,
+      unitInkCost: derived.inkCostPerUnit,
+      unitElectricityCost: derived.electricityCostPerUnit,
+      unitWearCost: derived.wearCostPerUnit,
+      unitWasteCost: derived.wasteCostPerUnit,
+      unitBagCost: 0.49,
+      unitLabelCost: 0.21,
+    })
+    expect(unitDirectCost).toBeCloseTo(68.99, 6)
   })
 
   it('deriveKitMaterialRecipe suma el consumo de materiales de cada componente * su cantidad', () => {
