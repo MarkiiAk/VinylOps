@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:catalog": "tsx prisma/seed-catalog.ts",
     "db:backup": "node scripts/db-backup.mjs",
     "db:check": "node scripts/db-check.mjs",
     "db:migrate": "prisma migrate dev"
