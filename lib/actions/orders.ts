@@ -23,6 +23,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import type { Prisma } from '@/lib/generated/prisma/client'
+import { computeLineSnapshot } from '@/lib/costing'
 
 export interface QuoteLineItemInput {
   catalogItemId?: string
@@ -31,6 +32,18 @@ export interface QuoteLineItemInput {
   unitPrice: number
   otherMaterialId?: string
   otherMaterialAreaCm2?: number
+  // FASE 2 (V1): costos granulares para líneas "Otro" (manuales). Para
+  // líneas de catálogo estos valores se ignoran — se toman del CatalogItem
+  // vigente al momento de congelar el snapshot (ver resolvedLines abajo).
+  // Todos son POR UNIDAD, default 0 si no se especifican (la UI debe
+  // advertir al usuario cuando deja una línea manual en costo implícito 0).
+  unitInkCost?: number
+  unitElectricityCost?: number
+  unitWearCost?: number
+  unitWasteCost?: number
+  unitBagCost?: number
+  unitLabelCost?: number
+  estimatedUnitLabor?: number
 }
 
 export interface CreateOrderInput {
@@ -60,6 +73,18 @@ function validateLineItems(lineItems: QuoteLineItemInput[]) {
     if (line.otherMaterialAreaCm2 !== undefined && line.otherMaterialAreaCm2 <= 0) {
       throw new Error('El área de material declarada debe ser mayor a cero')
     }
+    const costFields = [
+      line.unitInkCost,
+      line.unitElectricityCost,
+      line.unitWearCost,
+      line.unitWasteCost,
+      line.unitBagCost,
+      line.unitLabelCost,
+      line.estimatedUnitLabor,
+    ]
+    if (costFields.some((v) => v !== undefined && v < 0)) {
+      throw new Error('Los costos declarados en una línea no pueden ser negativos')
+    }
   }
 }
 
@@ -86,10 +111,25 @@ export async function createOrder(input: CreateOrderInput) {
     .filter((id): id is string => Boolean(id))
 
   const catalogItems = catalogItemIds.length
-    ? await prisma.catalogItem.findMany({ where: { id: { in: catalogItemIds } } })
+    ? await prisma.catalogItem.findMany({
+        where: { id: { in: catalogItemIds } },
+        include: { materials: { include: { material: true } } },
+      })
     : []
   const catalogItemMap = new Map(catalogItems.map((item) => [item.id, item]))
 
+  const otherMaterialIds = input.lineItems
+    .filter((line) => !line.catalogItemId && line.otherMaterialId)
+    .map((line) => line.otherMaterialId as string)
+
+  const otherMaterials = otherMaterialIds.length
+    ? await prisma.material.findMany({ where: { id: { in: otherMaterialIds } } })
+    : []
+  const otherMaterialMap = new Map(otherMaterials.map((m) => [m.id, m]))
+
+  // FASE 2 (V1): cada línea congela AQUÍ, al crear el pedido, su snapshot
+  // financiero completo (ver lib/costing.ts) — nunca se vuelve a recalcular
+  // después, aunque cambie el catálogo, el costo de un material o el precio.
   const resolvedLines = input.lineItems.map((line) => {
     const catalogItem = line.catalogItemId ? catalogItemMap.get(line.catalogItemId) : undefined
     if (line.catalogItemId && !catalogItem) {
@@ -100,6 +140,55 @@ export async function createOrder(input: CreateOrderInput) {
     const unitPrice = line.unitPrice
     const lineTotal = unitPrice * line.quantity
 
+    let unitCosts: {
+      unitMaterialCost: number
+      unitInkCost: number
+      unitElectricityCost: number
+      unitWearCost: number
+      unitWasteCost: number
+      unitBagCost: number
+      unitLabelCost: number
+      estimatedUnitLabor: number
+    }
+
+    if (catalogItem) {
+      const unitMaterialCost = catalogItem.materials.reduce(
+        (sum, m) => sum + m.areaCm2PerUnit * m.material.weightedAverageCostPerCm2,
+        0
+      )
+      unitCosts = {
+        unitMaterialCost,
+        unitInkCost: catalogItem.inkCostPerUnit,
+        unitElectricityCost: catalogItem.electricityCostPerUnit,
+        unitWearCost: catalogItem.wearCostPerUnit,
+        unitWasteCost: catalogItem.wasteCostPerUnit,
+        unitBagCost: catalogItem.bagCostPerUnit,
+        unitLabelCost: catalogItem.labelCostPerUnit,
+        estimatedUnitLabor: catalogItem.laborCostPerUnit,
+      }
+    } else {
+      const otherMaterial = line.otherMaterialId ? otherMaterialMap.get(line.otherMaterialId) : undefined
+      // otherMaterialAreaCm2 es el área TOTAL de la línea (ya multiplicada
+      // por quantity, ver cart-types.ts) — se divide entre quantity para
+      // obtener el costo de material POR UNIDAD que espera el snapshot.
+      const unitMaterialCost =
+        otherMaterial && line.otherMaterialAreaCm2
+          ? (line.otherMaterialAreaCm2 * otherMaterial.weightedAverageCostPerCm2) / line.quantity
+          : 0
+      unitCosts = {
+        unitMaterialCost,
+        unitInkCost: line.unitInkCost ?? 0,
+        unitElectricityCost: line.unitElectricityCost ?? 0,
+        unitWearCost: line.unitWearCost ?? 0,
+        unitWasteCost: line.unitWasteCost ?? 0,
+        unitBagCost: line.unitBagCost ?? 0,
+        unitLabelCost: line.unitLabelCost ?? 0,
+        estimatedUnitLabor: line.estimatedUnitLabor ?? 0,
+      }
+    }
+
+    const snapshot = computeLineSnapshot({ ...unitCosts, quantity: line.quantity, lineTotal })
+
     return {
       catalogItemId: line.catalogItemId,
       description,
@@ -108,6 +197,7 @@ export async function createOrder(input: CreateOrderInput) {
       lineTotal,
       otherMaterialId: line.catalogItemId ? undefined : line.otherMaterialId,
       otherMaterialAreaCm2: line.catalogItemId ? undefined : line.otherMaterialAreaCm2,
+      snapshot,
     }
   })
 
@@ -123,7 +213,7 @@ export async function createOrder(input: CreateOrderInput) {
     })
 
     for (const line of resolvedLines) {
-      await tx.quoteLineItem.create({
+      await tx.orderLineItem.create({
         data: {
           orderId: created.id,
           catalogItemId: line.catalogItemId,
@@ -133,6 +223,8 @@ export async function createOrder(input: CreateOrderInput) {
           lineTotal: line.lineTotal,
           otherMaterialId: line.otherMaterialId,
           otherMaterialAreaCm2: line.otherMaterialAreaCm2,
+          ...line.snapshot,
+          frozenAt: new Date(),
         },
       })
     }

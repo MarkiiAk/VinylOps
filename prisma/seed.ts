@@ -62,7 +62,7 @@ async function clearData() {
   // Orden: hijos antes que padres.
   await prisma.inventoryConsumption.deleteMany();
   await prisma.payment.deleteMany();
-  await prisma.quoteLineItem.deleteMany();
+  await prisma.orderLineItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.catalogSale.deleteMany();
   await prisma.catalogItemMaterial.deleteMany();

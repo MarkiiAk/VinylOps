@@ -36,7 +36,7 @@ model Material {
   purchases           Purchase[]
   consumptions        InventoryConsumption[]
   catalogUsages       CatalogItemMaterial[]
-  orderLineItemUsages QuoteLineItem[]
+  orderLineItemUsages OrderLineItem[]
 }
 
 model Purchase {
@@ -79,7 +79,7 @@ model Order {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  lineItems    QuoteLineItem[]
+  lineItems    OrderLineItem[]
   payments     Payment[]
   consumptions InventoryConsumption[]
 }
@@ -90,7 +90,16 @@ model Order {
 // "Otro" pueden declarar opcionalmente un material y area consumida, para
 // poder descontar inventario cuando no hay receta automatica (ver
 // updateOrderStatus en lib/actions/orders.ts).
-model QuoteLineItem {
+//
+// FASE 2 (V1, modelo financiero): cada linea congela, al momento de crearse,
+// un snapshot completo de sus costos unitarios (material/tinta/luz/desgaste/
+// merma/bolsa/etiquetita/mano de obra) y las ganancias/margenes derivados.
+// Este snapshot NUNCA se recalcula despues aunque cambie el catalogo o el
+// costo de un material — ver lib/costing.ts para las formulas exactas y
+// freezeLineItemSnapshot en lib/actions/orders.ts para el punto donde se
+// congela. Todos los campos de snapshot son nullable porque las 0 filas
+// creadas antes de esta fase no tienen (ni necesitan) este desglose.
+model OrderLineItem {
   id                   String       @id @default(cuid())
   orderId              String
   order                Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -103,7 +112,26 @@ model QuoteLineItem {
   otherMaterialId      String?
   otherMaterial        Material?    @relation(fields: [otherMaterialId], references: [id])
   otherMaterialAreaCm2 Float?
-  createdAt            DateTime     @default(now())
+
+  // --- snapshot financiero congelado (Fase 2, V1) ---
+  unitMaterialCost    Float?
+  unitInkCost         Float?
+  unitElectricityCost Float?
+  unitWearCost        Float?
+  unitWasteCost       Float?
+  unitBagCost         Float?
+  unitLabelCost       Float?
+  unitDirectCost      Float?
+  totalDirectCost     Float?
+  estimatedUnitLabor  Float?
+  totalLabor          Float?
+  lineGrossProfit     Float?
+  lineGrossMargin     Float?
+  profitAfterLabor    Float?
+  marginAfterLabor    Float?
+  frozenAt            DateTime?
+
+  createdAt DateTime @default(now())
 }
 
 // Pago real recibido sobre un Order (anticipo o liquidacion). paidAt es la
@@ -140,20 +168,57 @@ model InventoryConsumption {
 // venta del negocio, separada del flujo de pedidos custom (Order). Reusa
 // InventoryConsumption (vía catalogSaleId) para descontar inventario con el
 // mismo mecanismo que ya usa Order, sin duplicar esa tabla.
+//
+// FASE 2 (V1, modelo financiero): otherCostPerUnit queda como campo LEGADO
+// (mezclaba tinta + luz + tiempo del dueño, sin poder separarse sin inventar
+// datos financieros) — se conserva su valor histórico intacto pero deja de
+// usarse en los cálculos nuevos. Los 7 campos granulares de abajo son la
+// fuente de verdad de costo unitario en V1 y arrancan en 0: deben llenarse
+// manualmente desde /catalogo para cada producto (no se derivan
+// automáticamente de otherCostPerUnit).
 model CatalogItem {
-  id          String   @id @default(cuid())
-  name        String
-  isKit       Boolean  @default(false)
-  unitPrice   Float
-  otherCostPerUnit Float @default(0) // tinta + luz + tiempo del dueño por unidad, no viene de la receta de materiales
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                     String   @id @default(cuid())
+  name                   String
+  isKit                  Boolean  @default(false)
+  unitPrice              Float
+  otherCostPerUnit       Float    @default(0) // LEGADO: ver nota arriba, ya no se usa en calculos nuevos
+  inkCostPerUnit         Float    @default(0) // tinta
+  electricityCostPerUnit Float    @default(0) // luz
+  wearCostPerUnit        Float    @default(0) // desgaste de maquina/herramienta
+  wasteCostPerUnit       Float    @default(0) // provision de merma
+  bagCostPerUnit         Float    @default(0) // bolsa (compartida, 1 por kit cuando isKit)
+  labelCostPerUnit       Float    @default(0) // etiquetita (compartida, 1 por kit cuando isKit)
+  laborCostPerUnit       Float    @default(0) // mano de obra estimada
+  description            String?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   materials      CatalogItemMaterial[]
   sales          CatalogSale[]
-  orderLineItems QuoteLineItem[]
+  orderLineItems OrderLineItem[]
+
+  // Componentes de un kit (solo relevante cuando isKit=true): que productos
+  // del catalogo y en que cantidad lo integran, para poder mostrar "precio
+  // normal equivalente" y ahorro vs comprar por separado. Independiente de
+  // `materials` (la receta de materia prima real, usada para costo/
+  // inventario) — un kit tiene AMBAS: su propia receta de materiales (para
+  // costo/consumo) y su lista de componentes (para el calculo de ahorro).
+  kitComponents   CatalogItemComponent[] @relation("KitComponents")
+  componentOfKits CatalogItemComponent[] @relation("ComponentOf")
+}
+
+// Componente de un kit: cuantas unidades de otro CatalogItem (vendido tambien
+// por separado) incluye este kit. quantity puede ser fraccionaria (ej. 0.5 =
+// media hoja/carta) porque un kit puede incluir medio producto individual.
+model CatalogItemComponent {
+  id              String      @id @default(cuid())
+  kitId           String
+  kit             CatalogItem @relation("KitComponents", fields: [kitId], references: [id], onDelete: Cascade)
+  componentItemId String
+  componentItem   CatalogItem @relation("ComponentOf", fields: [componentItemId], references: [id])
+  quantity        Float
+  createdAt       DateTime    @default(now())
 }
 
 model CatalogItemMaterial {

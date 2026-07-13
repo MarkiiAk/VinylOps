@@ -75,6 +75,13 @@ export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartCl
             unitPrice: line.unitPrice,
             otherMaterialId: line.otherMaterialId,
             otherMaterialAreaCm2: line.otherMaterialAreaCm2,
+            unitInkCost: line.unitInkCost,
+            unitElectricityCost: line.unitElectricityCost,
+            unitWearCost: line.unitWearCost,
+            unitWasteCost: line.unitWasteCost,
+            unitBagCost: line.unitBagCost,
+            unitLabelCost: line.unitLabelCost,
+            estimatedUnitLabor: line.estimatedUnitLabor,
           })),
         });
 

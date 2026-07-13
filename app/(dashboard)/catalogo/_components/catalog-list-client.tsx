@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/empty-state";
 import { archiveCatalogItem, unarchiveCatalogItem } from "@/lib/actions/catalog";
-import { CatalogItemFormDialog, type CatalogMaterialOption } from "./catalog-item-form-dialog";
+import { CatalogItemFormDialog, type CatalogComponentOption, type CatalogMaterialOption } from "./catalog-item-form-dialog";
 
 export interface CatalogItemRow {
   id: string;
@@ -20,8 +20,22 @@ export interface CatalogItemRow {
   isActive: boolean;
   unitPrice: number;
   otherCostPerUnit: number;
+  inkCostPerUnit: number;
+  electricityCostPerUnit: number;
+  wearCostPerUnit: number;
+  wasteCostPerUnit: number;
+  bagCostPerUnit: number;
+  labelCostPerUnit: number;
+  laborCostPerUnit: number;
   productionCost: number;
   margin: number;
+  unitDirectCost: number;
+  grossProfit: number;
+  grossMargin: number;
+  profitAfterLabor: number;
+  marginAfterLabor: number;
+  kitSavings: { equivalentPrice: number; savingsAbsolute: number; savingsPercentage: number } | null;
+  kitComponents: { componentItemId: string; quantity: number; componentItem: { name: string; unitPrice: number } }[];
   materials: {
     id: string;
     materialId: string;
@@ -165,13 +179,17 @@ export function CatalogListClient({
                   <span className="text-right tabular-nums font-medium text-foreground">
                     {formatMXN(item.unitPrice)}
                   </span>
-                  <span className="text-muted-foreground">Costo producción</span>
+                  <span className="text-muted-foreground">Costo directo</span>
                   <span className="text-right tabular-nums text-foreground">
-                    {formatMXN(item.productionCost)}
+                    {formatMXN(item.unitDirectCost)}
                   </span>
-                  <span className="text-muted-foreground">Margen</span>
+                  <span className="text-muted-foreground">Ganancia bruta</span>
                   <span className="text-right tabular-nums font-medium text-success">
-                    {formatMXN(item.margin)}
+                    {formatMXN(item.grossProfit)} ({(item.grossMargin * 100).toFixed(0)}%)
+                  </span>
+                  <span className="text-muted-foreground">Ganancia c/mano de obra</span>
+                  <span className="text-right tabular-nums font-medium text-foreground">
+                    {formatMXN(item.profitAfterLabor)} ({(item.marginAfterLabor * 100).toFixed(0)}%)
                   </span>
                 </div>
 
@@ -184,6 +202,25 @@ export function CatalogListClient({
                   {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                   Qué necesita
                 </Button>
+
+                {expanded && item.isKit && item.kitComponents.length > 0 ? (
+                  <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
+                    {item.kitComponents.map((c) => (
+                      <li key={c.componentItemId} className="flex items-center justify-between gap-2">
+                        <span className="text-foreground">{c.componentItem.name}</span>
+                        <span className="text-right text-muted-foreground">× {c.quantity}</span>
+                      </li>
+                    ))}
+                    {item.kitSavings ? (
+                      <li className="flex items-center justify-between gap-2 border-t border-border pt-1.5 font-medium">
+                        <span className="text-foreground">Ahorro vs. comprar separado</span>
+                        <span className="text-right text-success">
+                          {formatMXN(item.kitSavings.savingsAbsolute)} ({(item.kitSavings.savingsPercentage * 100).toFixed(0)}%)
+                        </span>
+                      </li>
+                    ) : null}
+                  </ul>
+                ) : null}
 
                 {expanded ? (
                   <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
@@ -210,16 +247,28 @@ export function CatalogListClient({
                 <div className="mt-1 flex flex-wrap gap-2">
                   <CatalogItemFormDialog
                     materials={materials}
+                    componentOptions={items}
                     item={{
                       id: item.id,
                       name: item.name,
                       isKit: item.isKit,
                       unitPrice: item.unitPrice,
                       otherCostPerUnit: item.otherCostPerUnit,
+                      inkCostPerUnit: item.inkCostPerUnit,
+                      electricityCostPerUnit: item.electricityCostPerUnit,
+                      wearCostPerUnit: item.wearCostPerUnit,
+                      wasteCostPerUnit: item.wasteCostPerUnit,
+                      bagCostPerUnit: item.bagCostPerUnit,
+                      labelCostPerUnit: item.labelCostPerUnit,
+                      laborCostPerUnit: item.laborCostPerUnit,
                       description: item.description,
                       materials: item.materials.map((line) => ({
                         materialId: line.materialId,
                         areaCm2PerUnit: line.areaCm2PerUnit,
+                      })),
+                      kitComponents: item.kitComponents.map((c) => ({
+                        componentItemId: c.componentItemId,
+                        quantity: c.quantity,
                       })),
                     }}
                     trigger={

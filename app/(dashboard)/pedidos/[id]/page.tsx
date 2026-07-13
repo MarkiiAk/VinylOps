@@ -49,6 +49,16 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const totalPaid = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
   const balance = total - totalPaid;
 
+  // FASE 2 (V1): agregado del snapshot financiero congelado por línea (ver
+  // OrderLineItem en schema.prisma). Nullable porque líneas creadas antes de
+  // esta fase no tienen desglose — se suman como 0, nunca se re-derivan.
+  const totalDirectCost = order.lineItems.reduce((sum, line) => sum + (line.totalDirectCost ?? 0), 0);
+  const totalLabor = order.lineItems.reduce((sum, line) => sum + (line.totalLabor ?? 0), 0);
+  const grossProfit = total - totalDirectCost;
+  const grossMargin = total ? grossProfit / total : 0;
+  const profitAfterLabor = grossProfit - totalLabor;
+  const marginAfterLabor = total ? profitAfterLabor / total : 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -90,6 +100,37 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
           </p>
         </div>
       </div>
+
+      <div className="glass-panel grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl p-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
+        <div>
+          <p className="text-xs text-muted-foreground">Costo directo</p>
+          <p className="tabular-nums font-medium text-foreground">{formatMXN(totalDirectCost)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Ganancia bruta</p>
+          <p className="tabular-nums font-medium text-success">
+            {formatMXN(grossProfit)} <span className="text-xs text-muted-foreground">({(grossMargin * 100).toFixed(0)}%)</span>
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Mano de obra</p>
+          <p className="tabular-nums font-medium text-foreground">{formatMXN(totalLabor)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Ganancia c/mano de obra</p>
+          <p className="tabular-nums font-medium text-success">
+            {formatMXN(profitAfterLabor)}{" "}
+            <span className="text-xs text-muted-foreground">({(marginAfterLabor * 100).toFixed(0)}%)</span>
+          </p>
+        </div>
+        <div className="col-span-2 sm:col-span-1">
+          <p className="text-xs text-muted-foreground">Estado de entrega</p>
+          <p className="font-medium text-foreground">{order.status === "Entregado" ? "Entregado" : "Pendiente"}</p>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Nota: utilidad no es lo mismo que efectivo — &quot;Ganancia&quot; aquí es sobre el total vendido, no sobre lo cobrado.
+      </p>
 
       <OrderDeliveryDateEditor
         orderId={order.id}

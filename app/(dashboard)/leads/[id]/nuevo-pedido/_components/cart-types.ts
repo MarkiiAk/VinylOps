@@ -26,6 +26,16 @@ export interface CartLine {
   otherMaterialName?: string;
   /** Área total (cm2) para TODA la línea, ya multiplicada por quantity. */
   otherMaterialAreaCm2?: number;
+  // FASE 2 (V1): costos granulares POR UNIDAD para líneas "Otro" (manuales).
+  // Las líneas de catálogo no los usan aquí — se toman del CatalogItem
+  // vigente al congelar el snapshot en createOrder (lib/actions/orders.ts).
+  unitInkCost?: number;
+  unitElectricityCost?: number;
+  unitWearCost?: number;
+  unitWasteCost?: number;
+  unitBagCost?: number;
+  unitLabelCost?: number;
+  estimatedUnitLabor?: number;
 }
 
 export function lineTotal(line: CartLine): number {

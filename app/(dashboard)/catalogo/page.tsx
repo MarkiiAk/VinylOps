@@ -24,7 +24,7 @@ export default async function CatalogoPage() {
       <SectionHeading
         title="Catálogo"
         subtitle="Productos de precio fijo: etiquetas escolares y kits, con su receta y margen."
-        action={<CatalogItemFormDialog materials={materials} />}
+        action={<CatalogItemFormDialog materials={materials} componentOptions={items} />}
       />
 
       <CatalogListClient items={items} materials={materials} />

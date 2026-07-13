@@ -37,10 +37,29 @@ interface AddOtherItemDialogProps {
     otherMaterialId?: string;
     otherMaterialName?: string;
     otherMaterialAreaCm2?: number;
+    unitInkCost?: number;
+    unitElectricityCost?: number;
+    unitWearCost?: number;
+    unitWasteCost?: number;
+    unitBagCost?: number;
+    unitLabelCost?: number;
+    estimatedUnitLabor?: number;
   }) => void;
 }
 
 const NONE_MATERIAL = "__none__";
+
+const COST_FIELDS = [
+  ["unitInkCost", "Tinta"],
+  ["unitElectricityCost", "Luz"],
+  ["unitWearCost", "Desgaste"],
+  ["unitWasteCost", "Merma"],
+  ["unitBagCost", "Bolsa"],
+  ["unitLabelCost", "Etiquetita"],
+  ["estimatedUnitLabor", "Mano de obra"],
+] as const;
+
+type CostFieldKey = (typeof COST_FIELDS)[number][0];
 
 /**
  * Dialog "Agregar Otro": trabajo fuera de catálogo, 100% manual — el dueño
@@ -62,12 +81,25 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
   const [materialId, setMaterialId] = useState<string>(NONE_MATERIAL);
   const [sheets, setSheets] = useState("1");
   const [manualAreaCm2, setManualAreaCm2] = useState("");
+  const [costs, setCosts] = useState<Record<CostFieldKey, string>>({
+    unitInkCost: "0",
+    unitElectricityCost: "0",
+    unitWearCost: "0",
+    unitWasteCost: "0",
+    unitBagCost: "0",
+    unitLabelCost: "0",
+    estimatedUnitLabor: "0",
+  });
 
   const selectedMaterial = materials.find((m) => m.id === materialId);
   const hasFixedSheet = Boolean(selectedMaterial?.sheetWidthCm && selectedMaterial?.sheetHeightCm);
 
   const parsedQuantity = parseInt(quantity || "0", 10) || 0;
   const parsedUnitPrice = Number(unitPrice) || 0;
+  const parsedCosts = Object.fromEntries(
+    COST_FIELDS.map(([field]) => [field, Number(costs[field]) || 0])
+  ) as Record<CostFieldKey, number>;
+  const hasAnyDeclaredCost = Boolean(selectedMaterial) || Object.values(parsedCosts).some((v) => v > 0);
 
   function computeTotalAreaCm2(): number | undefined {
     if (!selectedMaterial) return undefined;
@@ -87,10 +119,26 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
     setMaterialId(NONE_MATERIAL);
     setSheets("1");
     setManualAreaCm2("");
+    setCosts({
+      unitInkCost: "0",
+      unitElectricityCost: "0",
+      unitWearCost: "0",
+      unitWasteCost: "0",
+      unitBagCost: "0",
+      unitLabelCost: "0",
+      estimatedUnitLabor: "0",
+    });
   }
 
   function handleAdd() {
     if (!description.trim() || parsedQuantity <= 0 || parsedUnitPrice < 0) return;
+
+    if (!hasAnyDeclaredCost) {
+      const confirmed = window.confirm(
+        "No declaraste ningún costo (material, tinta, luz, desgaste, merma, bolsa, etiquetita, mano de obra) para esta línea. Su ganancia se calculará como si costara $0 de producirla. ¿Continuar de todas formas?"
+      );
+      if (!confirmed) return;
+    }
 
     const totalAreaCm2 = computeTotalAreaCm2();
 
@@ -101,6 +149,7 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
       otherMaterialId: selectedMaterial?.id,
       otherMaterialName: selectedMaterial?.name,
       otherMaterialAreaCm2: selectedMaterial ? totalAreaCm2 : undefined,
+      ...parsedCosts,
     });
     setOpen(false);
     reset();
@@ -223,6 +272,33 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
               </div>
             )
           ) : null}
+
+          <div className="space-y-1.5 border-t border-border pt-3">
+            <Label className="text-xs text-muted-foreground">Costos por unidad (opcional, para calcular ganancia)</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {COST_FIELDS.map(([field, label]) => (
+                <div key={field} className="space-y-1">
+                  <Label htmlFor={`other-${field}`} className="text-xs text-muted-foreground">
+                    {label}
+                  </Label>
+                  <Input
+                    id={`other-${field}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={costs[field]}
+                    onChange={(e) => setCosts((c) => ({ ...c, [field]: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              ))}
+            </div>
+            {!hasAnyDeclaredCost ? (
+              <p className="text-xs text-amber-500">
+                Sin costos declarados: la ganancia de esta línea se verá como si costara $0.
+              </p>
+            ) : null}
+          </div>
 
           {parsedQuantity > 0 && parsedUnitPrice >= 0 ? (
             <p className="text-sm text-muted-foreground">
