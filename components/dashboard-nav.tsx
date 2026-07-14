@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
-  LayoutDashboard,
   Layers,
   Kanban,
   Calendar,
@@ -49,7 +48,6 @@ import {
 const NAV_ITEMS = [
   { href: "/catalogo", label: "Catalogo", icon: Package },
   { href: "/leads", label: "Leads", icon: MessageCircleMore },
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/inventario", label: "Inventario", icon: Boxes },
   { href: "/materiales", label: "Materiales", icon: Layers },
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
@@ -71,7 +69,6 @@ const MOBILE_PRIMARY_ITEMS = [
   { href: "/leads", label: "Leads", icon: MessageCircleMore },
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
   { href: "/calendario", label: "Calendario", icon: Calendar },
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
 ];
 
 const MOBILE_MORE_ITEMS = [

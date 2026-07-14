@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ChevronDown, ChevronUp, Package, PackageOpen } from "lucide-react";
@@ -8,6 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
 import { archiveCatalogItem, unarchiveCatalogItem } from "@/lib/actions/catalog";
 import { CatalogItemFormDialog, type CatalogMaterialOption } from "./catalog-item-form-dialog";
@@ -155,153 +163,173 @@ export function CatalogListClient({
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((item) => {
-            const expanded = expandedId === item.id;
-            return (
-              <div key={item.id} className="glass-panel flex flex-col gap-3 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-heading text-base font-medium text-foreground">{item.name}</p>
-                    {item.description ? (
-                      <p className="text-xs text-muted-foreground">{item.description}</p>
-                    ) : null}
-                  </div>
-                  {item.isKit ? (
-                    <Badge className="shrink-0 gap-1 bg-accent/15 text-accent">
-                      <PackageOpen className="size-3" />
-                      Kit
-                    </Badge>
-                  ) : null}
-                </div>
-
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-                  <span className="text-muted-foreground">Precio</span>
-                  <span className="text-right tabular-nums font-medium text-foreground">
-                    {formatMXN(item.unitPrice)}
-                  </span>
-                  <span className="text-muted-foreground">Costo directo</span>
-                  <span className="text-right tabular-nums text-foreground">
-                    {formatMXN(item.unitDirectCost)}
-                  </span>
-                  <span className="text-muted-foreground">Ganancia bruta</span>
-                  <span className="text-right tabular-nums font-medium text-success">
-                    {formatMXN(item.grossProfit)} ({(item.grossMargin * 100).toFixed(0)}%)
-                  </span>
-                  <span className="text-muted-foreground">Ganancia c/mano de obra</span>
-                  <span className="text-right tabular-nums font-medium text-foreground">
-                    {formatMXN(item.profitAfterLabor)} ({(item.marginAfterLabor * 100).toFixed(0)}%)
-                  </span>
-                </div>
-
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="justify-start gap-1.5 self-start text-xs text-muted-foreground"
-                  onClick={() => setExpandedId(expanded ? null : item.id)}
-                >
-                  {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                  Qué necesita
-                </Button>
-
-                {expanded && item.isKit && item.kitComponents.length > 0 ? (
-                  <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
-                    {item.kitComponents.map((c) => (
-                      <li key={c.componentItemId} className="flex items-center justify-between gap-2">
-                        <span className="text-foreground">{c.componentItem.name}</span>
-                        <span className="text-right text-muted-foreground">× {c.quantity}</span>
-                      </li>
-                    ))}
-                    {item.kitSavings ? (
-                      <li className="flex items-center justify-between gap-2 border-t border-border pt-1.5 font-medium">
-                        <span className="text-foreground">Ahorro vs. comprar separado</span>
-                        <span className="text-right text-success">
-                          {formatMXN(item.kitSavings.savingsAbsolute)} ({(item.kitSavings.savingsPercentage * 100).toFixed(0)}%)
-                        </span>
-                      </li>
-                    ) : null}
-                  </ul>
-                ) : null}
-
-                {expanded ? (
-                  <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
-                    {item.materials.length === 0 ? (
-                      <li className="text-muted-foreground">Sin receta de materiales.</li>
-                    ) : (
-                      item.materials.map((line) => (
-                        <li key={line.id} className="flex items-center justify-between gap-2">
-                          <span className="text-foreground">{line.material.name}</span>
-                          <span className="text-right text-muted-foreground">
-                            {formatMaterialQuantity(
-                              line.areaCm2PerUnit,
-                              line.material.sheetWidthCm,
-                              line.material.sheetHeightCm
-                            )}
-                            {line.material.supplierDefault ? ` · ${line.material.supplierDefault}` : ""}
+        <div className="glass-panel overflow-x-auto rounded-xl">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead>Producto</TableHead>
+                <TableHead className="text-right">Precio</TableHead>
+                <TableHead className="text-right">Costo directo</TableHead>
+                <TableHead className="text-right">Ganancia bruta</TableHead>
+                <TableHead className="text-right">Ganancia c/mano de obra</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((item) => {
+                const expanded = expandedId === item.id;
+                return (
+                  <Fragment key={item.id}>
+                    <TableRow className="border-border">
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(expanded ? null : item.id)}
+                          className="flex items-start gap-1.5 text-left"
+                        >
+                          {expanded ? (
+                            <ChevronUp className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="min-w-0">
+                            <span className="flex items-center gap-1.5">
+                              <span className="font-medium text-foreground">{item.name}</span>
+                              {item.isKit ? (
+                                <Badge className="shrink-0 gap-1 bg-accent/15 text-accent">
+                                  <PackageOpen className="size-3" />
+                                  Kit
+                                </Badge>
+                              ) : null}
+                            </span>
+                            {item.description ? (
+                              <span className="block text-xs text-muted-foreground">{item.description}</span>
+                            ) : null}
                           </span>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                ) : null}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium text-foreground">
+                        {formatMXN(item.unitPrice)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatMXN(item.unitDirectCost)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium text-success">
+                        {formatMXN(item.grossProfit)} ({(item.grossMargin * 100).toFixed(0)}%)
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-medium text-foreground">
+                        {formatMXN(item.profitAfterLabor)} ({(item.marginAfterLabor * 100).toFixed(0)}%)
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1.5">
+                          <CatalogItemFormDialog
+                            materials={materials}
+                            componentOptions={items}
+                            item={{
+                              id: item.id,
+                              name: item.name,
+                              isKit: item.isKit,
+                              unitPrice: item.unitPrice,
+                              otherCostPerUnit: item.otherCostPerUnit,
+                              materialCostPerUnit: item.materialCostPerUnit,
+                              inkCostPerUnit: item.inkCostPerUnit,
+                              electricityCostPerUnit: item.electricityCostPerUnit,
+                              wearCostPerUnit: item.wearCostPerUnit,
+                              wasteCostPerUnit: item.wasteCostPerUnit,
+                              bagCostPerUnit: item.bagCostPerUnit,
+                              labelCostPerUnit: item.labelCostPerUnit,
+                              laborCostPerUnit: item.laborCostPerUnit,
+                              description: item.description,
+                              materials: item.materials.map((line) => ({
+                                materialId: line.materialId,
+                                areaCm2PerUnit: line.areaCm2PerUnit,
+                              })),
+                              kitComponents: item.kitComponents.map((c) => ({
+                                componentItemId: c.componentItemId,
+                                quantity: c.quantity,
+                              })),
+                            }}
+                            trigger={
+                              <Button size="sm" variant="ghost">
+                                Editar
+                              </Button>
+                            }
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="gap-1.5 text-muted-foreground"
+                            disabled={archivingId === item.id}
+                            onClick={() => handleArchiveToggle(item)}
+                          >
+                            {item.isActive ? (
+                              <>
+                                <Archive className="size-3.5" />
+                                Archivar
+                              </>
+                            ) : (
+                              <>
+                                <ArchiveRestore className="size-3.5" />
+                                Reactivar
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
 
-                <div className="mt-1 flex flex-wrap gap-2">
-                  <CatalogItemFormDialog
-                    materials={materials}
-                    componentOptions={items}
-                    item={{
-                      id: item.id,
-                      name: item.name,
-                      isKit: item.isKit,
-                      unitPrice: item.unitPrice,
-                      otherCostPerUnit: item.otherCostPerUnit,
-                      materialCostPerUnit: item.materialCostPerUnit,
-                      inkCostPerUnit: item.inkCostPerUnit,
-                      electricityCostPerUnit: item.electricityCostPerUnit,
-                      wearCostPerUnit: item.wearCostPerUnit,
-                      wasteCostPerUnit: item.wasteCostPerUnit,
-                      bagCostPerUnit: item.bagCostPerUnit,
-                      labelCostPerUnit: item.labelCostPerUnit,
-                      laborCostPerUnit: item.laborCostPerUnit,
-                      description: item.description,
-                      materials: item.materials.map((line) => ({
-                        materialId: line.materialId,
-                        areaCm2PerUnit: line.areaCm2PerUnit,
-                      })),
-                      kitComponents: item.kitComponents.map((c) => ({
-                        componentItemId: c.componentItemId,
-                        quantity: c.quantity,
-                      })),
-                    }}
-                    trigger={
-                      <Button size="sm" variant="ghost">
-                        Editar
-                      </Button>
-                    }
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="ml-auto gap-1.5 text-muted-foreground"
-                    disabled={archivingId === item.id}
-                    onClick={() => handleArchiveToggle(item)}
-                  >
-                    {item.isActive ? (
-                      <>
-                        <Archive className="size-3.5" />
-                        Archivar
-                      </>
-                    ) : (
-                      <>
-                        <ArchiveRestore className="size-3.5" />
-                        Reactivar
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+                    {expanded ? (
+                      <TableRow className="border-border bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={6}>
+                          <div className="space-y-2">
+                            {item.isKit && item.kitComponents.length > 0 ? (
+                              <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
+                                {item.kitComponents.map((c) => (
+                                  <li key={c.componentItemId} className="flex items-center justify-between gap-2">
+                                    <span className="text-foreground">{c.componentItem.name}</span>
+                                    <span className="text-right text-muted-foreground">× {c.quantity}</span>
+                                  </li>
+                                ))}
+                                {item.kitSavings ? (
+                                  <li className="flex items-center justify-between gap-2 border-t border-border pt-1.5 font-medium">
+                                    <span className="text-foreground">Ahorro vs. comprar separado</span>
+                                    <span className="text-right text-success">
+                                      {formatMXN(item.kitSavings.savingsAbsolute)} (
+                                      {(item.kitSavings.savingsPercentage * 100).toFixed(0)}%)
+                                    </span>
+                                  </li>
+                                ) : null}
+                              </ul>
+                            ) : null}
+
+                            <ul className="space-y-1 rounded-lg bg-muted/40 p-2.5 text-xs">
+                              {item.materials.length === 0 ? (
+                                <li className="text-muted-foreground">Sin receta de materiales.</li>
+                              ) : (
+                                item.materials.map((line) => (
+                                  <li key={line.id} className="flex items-center justify-between gap-2">
+                                    <span className="text-foreground">{line.material.name}</span>
+                                    <span className="text-right text-muted-foreground">
+                                      {formatMaterialQuantity(
+                                        line.areaCm2PerUnit,
+                                        line.material.sheetWidthCm,
+                                        line.material.sheetHeightCm
+                                      )}
+                                      {line.material.supplierDefault ? ` · ${line.material.supplierDefault}` : ""}
+                                    </span>
+                                  </li>
+                                ))
+                              )}
+                            </ul>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
