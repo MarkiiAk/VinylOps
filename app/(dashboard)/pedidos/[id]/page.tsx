@@ -15,6 +15,7 @@ import { getOrder } from "@/lib/actions/orders";
 import { OrderStatusSelect } from "../_components/order-status-select";
 import { RegisterPaymentDialog } from "../_components/register-payment-dialog";
 import { OrderDeliveryDateEditor } from "./_components/order-delivery-date-editor";
+import { DeleteOrderButton } from "./_components/delete-order-button";
 
 function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
@@ -88,7 +89,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             order.lead.phone || "Sin teléfono",
             `Creado ${formatDate(order.createdAt)}`,
           ].join(" · ")}
-          action={<OrderStatusSelect orderId={order.id} status={order.status} size="default" className="w-48" />}
+          action={
+            <div className="flex items-center gap-2">
+              <OrderStatusSelect orderId={order.id} status={order.status} size="default" className="w-48" />
+              <DeleteOrderButton orderId={order.id} leadId={order.leadId} interest={order.interest} />
+            </div>
+          }
         />
       </div>
 

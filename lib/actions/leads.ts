@@ -14,6 +14,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { requireSession } from '@/lib/auth'
+import { deleteOrderWithinTx } from '@/lib/actions/orders'
 
 export interface CreateLeadInput {
   name?: string
@@ -69,11 +70,31 @@ export async function updateLead(id: string, input: UpdateLeadInput) {
   return lead
 }
 
+/**
+ * Elimina un lead y TODO su historial de pedidos (con sus pagos/líneas,
+ * regresando cualquier inventario que se les hubiera descontado — ver
+ * deleteOrderWithinTx). Es destructivo a propósito: la UI debe confirmar
+ * antes, mostrando cuántos pedidos se van a borrar con él.
+ */
 export async function deleteLead(id: string) {
   await requireSession()
-  await prisma.lead.delete({ where: { id } })
+
+  await prisma.$transaction(async (tx) => {
+    const orders = await tx.order.findMany({ where: { leadId: id }, select: { id: true } })
+    for (const order of orders) {
+      await deleteOrderWithinTx(tx, order.id)
+    }
+    await tx.lead.delete({ where: { id } })
+  })
 
   revalidatePath('/leads')
+  revalidatePath('/pedidos')
+  revalidatePath('/materiales')
+}
+
+/** Cuántos pedidos tiene un lead — para que la UI advierta antes de borrar. */
+export async function countLeadOrders(id: string) {
+  return prisma.order.count({ where: { leadId: id } })
 }
 
 /** Lead + todo su historial de pedidos (orders), para /leads/[id]. */

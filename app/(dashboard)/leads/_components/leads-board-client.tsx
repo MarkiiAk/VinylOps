@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { LeadStatusBadge, LEAD_STATUS_OPTIONS } from "@/components/lead-status-badge";
-import { updateLead, deleteLead } from "@/lib/actions/leads";
+import { updateLead, deleteLead, countLeadOrders } from "@/lib/actions/leads";
 import { LeadFormDialog } from "./lead-form-dialog";
 
 export interface LeadRow {
@@ -62,9 +62,15 @@ export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
 
   function handleDelete(lead: LeadRow) {
     const label = lead.name || "este lead";
-    if (!window.confirm(`¿Eliminar ${label}? Esta acción no se puede deshacer.`)) return;
     startTransition(async () => {
       try {
+        const orderCount = await countLeadOrders(lead.id);
+        const warning =
+          orderCount > 0
+            ? `¿Eliminar ${label}? Esto también borra ${orderCount} pedido(s) suyo(s) con sus pagos — no se puede deshacer.`
+            : `¿Eliminar ${label}? Esta acción no se puede deshacer.`;
+        if (!window.confirm(warning)) return;
+
         await deleteLead(lead.id);
         toast.success("Lead eliminado");
         router.refresh();

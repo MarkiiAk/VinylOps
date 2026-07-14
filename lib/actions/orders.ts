@@ -489,3 +489,51 @@ export async function setOrderDeliveryDate(id: string, deliveryDate: Date | null
 
   return order
 }
+
+/**
+ * Borra un Order dentro de una transacción ya abierta — usado tanto por
+ * `deleteOrder` (borrar un solo pedido) como por `deleteLead` (borrar un
+ * lead con todo su historial de pedidos). OrderLineItem y Payment ya tienen
+ * `onDelete: Cascade` a nivel de base — lo único que hay que manejar a mano
+ * es InventoryConsumption: antes de borrarlo, se le REGRESA el área/valor
+ * consumido al Material, para no dejar el inventario permanentemente
+ * reducido por un pedido que ya no existe.
+ */
+export async function deleteOrderWithinTx(tx: Prisma.TransactionClient, orderId: string) {
+  const consumptions = await tx.inventoryConsumption.findMany({ where: { orderId } })
+  for (const consumption of consumptions) {
+    await tx.material.update({
+      where: { id: consumption.materialId },
+      data: {
+        totalAreaCm2: { increment: consumption.areaConsumedCm2 },
+        totalValue: { increment: consumption.costConsumed },
+      },
+    })
+  }
+  await tx.inventoryConsumption.deleteMany({ where: { orderId } })
+  await tx.order.delete({ where: { id: orderId } })
+}
+
+/**
+ * Elimina un pedido — borra sus pagos/líneas (cascada) y le regresa al
+ * material cualquier inventario que se le hubiera descontado. No hay
+ * "archivar" para pedidos (a diferencia de Catálogo/Materiales): un pedido
+ * mal capturado se borra directo, con confirmación en la UI.
+ */
+export async function deleteOrder(id: string) {
+  await requireSession()
+
+  const existing = await prisma.order.findUnique({ where: { id } })
+  if (!existing) {
+    throw new Error('No se encontró el pedido a eliminar')
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await deleteOrderWithinTx(tx, id)
+  })
+
+  revalidatePath('/pedidos')
+  revalidatePath(`/leads/${existing.leadId}`)
+  revalidatePath('/materiales')
+  revalidatePath('/')
+}
