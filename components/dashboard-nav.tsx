@@ -32,48 +32,22 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// "Catalogo" va primero: es lo que el negocio vende hoy (etiquetas escolares
-// + kits de precio fijo), foco principal del producto segun el dueño.
-// "Leads" va justo despues: es el paso anterior a un pedido custom
-// (seguimiento de clientas que preguntan por WhatsApp antes de comprar).
-// "Pedidos" es el tablero Kanban de produccion de esos leads ya ganados.
-// "Inventario" y "Materiales" van despues de Dashboard: son consulta de
-// referencia (stock real y catalogo de costo respectivamente), no accion
-// diaria como Catalogo/Leads/Pedidos. Inventario antes que Materiales
-// porque el stock es lo que se revisa mas seguido; Materiales (catalogo
-// completo, incluye costo de maquila) es mas ocasional.
-// "Calendario" va justo despues de "Pedidos": es una vista alternativa de
-// la misma data (fecha de entrega de las tarjetas de Order), no una seccion
-// nueva de datos.
+// Simplificado a proposito (2026-07, feedback del dueño: "todo tiene 1000000
+// cosas que no necesito"): el uso diario real son 3 pantallas — Catalogo
+// (que se vende), Leads (seguimiento antes de la venta) y Pedidos (kanban
+// de produccion + pagos). Todo lo demas (Materiales, Inventario, Calendario,
+// Gastos, Reportes, Configuracion) sigue existiendo tal cual, probado y
+// funcional — solo se movio a "Mas" para no estorbar en el uso diario.
 const NAV_ITEMS = [
   { href: "/catalogo", label: "Catalogo", icon: Package },
   { href: "/leads", label: "Leads", icon: MessageCircleMore },
-  { href: "/inventario", label: "Inventario", icon: Boxes },
-  { href: "/materiales", label: "Materiales", icon: Layers },
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
-  { href: "/calendario", label: "Calendario", icon: Calendar },
-  { href: "/gastos", label: "Gastos", icon: Receipt },
-  { href: "/reportes/financiero", label: "Reportes", icon: LineChart },
-  { href: "/configuracion", label: "Configuracion", icon: Settings },
 ];
 
-// Mobile: 5 accesos directos (accion diaria) + "Mas" con el resto en un
-// dialog. Decision de UX resuelta (2026-07-07) — antes se reusaba
-// NAV_ITEMS completo (8 items) sin recortar, ilegible en la barra inferior.
-// Prioridad: Catalogo/Leads/Pedidos/Calendario son accion diaria del
-// negocio (vender, dar seguimiento, avanzar produccion, ver entregas);
-// Dashboard se deja como resumen rapido. Inventario/Materiales/Config son
-// consulta ocasional, van dentro de "Mas".
-const MOBILE_PRIMARY_ITEMS = [
-  { href: "/catalogo", label: "Catalogo", icon: Package },
-  { href: "/leads", label: "Leads", icon: MessageCircleMore },
-  { href: "/pedidos", label: "Pedidos", icon: Kanban },
-  { href: "/calendario", label: "Calendario", icon: Calendar },
-];
-
-const MOBILE_MORE_ITEMS = [
-  { href: "/inventario", label: "Inventario", icon: Boxes },
+const MORE_ITEMS = [
   { href: "/materiales", label: "Materiales", icon: Layers },
+  { href: "/inventario", label: "Inventario", icon: Boxes },
+  { href: "/calendario", label: "Calendario", icon: Calendar },
   { href: "/gastos", label: "Gastos", icon: Receipt },
   { href: "/reportes/financiero", label: "Reportes", icon: LineChart },
   { href: "/configuracion", label: "Configuracion", icon: Settings },
@@ -126,6 +100,8 @@ export function ThemeToggle() {
 /** Sidebar fija de desktop (md+). Indicador de seccion activa con acento cian. */
 export function DesktopSidebar({ businessName }: { businessName: string }) {
   const pathname = usePathname();
+  const moreActive = MORE_ITEMS.some((item) => isActive(pathname, item.href));
+  const [moreOpen, setMoreOpen] = useState(moreActive);
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-sidebar md:flex">
@@ -172,6 +148,43 @@ export function DesktopSidebar({ businessName }: { businessName: string }) {
             </Link>
           );
         })}
+
+        <button
+          type="button"
+          onClick={() => setMoreOpen((v) => !v)}
+          className={cn(
+            "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            moreActive
+              ? "bg-sidebar-accent text-foreground"
+              : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+          )}
+        >
+          <MoreHorizontal className={cn("size-4", moreActive && "text-primary")} strokeWidth={2} />
+          Mas
+        </button>
+
+        {moreOpen ? (
+          <div className="flex flex-col gap-1 border-l border-border pl-3">
+            {MORE_ITEMS.map((item) => {
+              const active = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground"
+                  )}
+                >
+                  <item.icon className={cn("size-4", active && "text-primary")} strokeWidth={2} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ) : null}
       </nav>
 
       <div className="flex flex-col gap-2 px-3 pb-5">
@@ -191,12 +204,12 @@ export function DesktopSidebar({ businessName }: { businessName: string }) {
 export function MobileBottomNav() {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = MOBILE_MORE_ITEMS.some((item) => isActive(pathname, item.href));
+  const moreActive = MORE_ITEMS.some((item) => isActive(pathname, item.href));
 
   return (
     <nav className="pb-safe fixed inset-x-0 bottom-0 z-40 border-t border-border bg-sidebar/95 backdrop-blur-lg md:hidden">
       <div className="flex items-stretch justify-around">
-        {MOBILE_PRIMARY_ITEMS.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -233,7 +246,7 @@ export function MobileBottomNav() {
               <DialogTitle>Mas opciones</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-1">
-              {MOBILE_MORE_ITEMS.map((item) => {
+              {MORE_ITEMS.map((item) => {
                 const active = isActive(pathname, item.href);
                 return (
                   <Link
