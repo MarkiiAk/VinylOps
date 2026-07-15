@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createPurchase } from "@/lib/actions/purchases";
 import { calculateAreaCm2, calculatePurchaseCostPerCm2, calculateWeightedAverageCost } from "@/lib/pricing";
-import { costPerSheet, hasFixedSheet } from "@/lib/sheet-units";
+import { costPerSheet, hasFixedSheet, isPieceUnit } from "@/lib/sheet-units";
 
 interface MaterialForPurchase {
   id: string;
@@ -31,6 +31,7 @@ interface MaterialForPurchase {
   isInventoryTracked?: boolean;
   sheetWidthCm: number | null;
   sheetHeightCm: number | null;
+  unit: string;
 }
 
 interface PurchaseFormProps {
@@ -65,6 +66,7 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
   const router = useRouter();
   const isCostOnly = material.isInventoryTracked === false;
   const fixedSheet = hasFixedSheet(material);
+  const pieceUnit = isPieceUnit(material);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,9 +75,11 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
   // toman de ahí directo — no tiene sentido volver a preguntarlos en cada
   // compra (feedback del dueño: "ya te dije son hojas we, para que necesito
   // cm de alto y ancho"). Solo se piden a mano para el caso raro de un
-  // material sin hoja fija.
-  const [widthCm, setWidthCm] = useState(fixedSheet ? String(material.sheetWidthCm) : "");
-  const [heightCm, setHeightCm] = useState(fixedSheet ? String(material.sheetHeightCm) : "");
+  // material sin hoja fija. Para materiales por PIEZA, ancho=alto=1 siempre
+  // (ocultos al usuario) — así el mismo motor de costeo por área calcula
+  // "costo por pieza" sin necesitar una fórmula aparte (1 pieza = 1 unidad).
+  const [widthCm, setWidthCm] = useState(fixedSheet ? String(material.sheetWidthCm) : pieceUnit ? "1" : "");
+  const [heightCm, setHeightCm] = useState(fixedSheet ? String(material.sheetHeightCm) : pieceUnit ? "1" : "");
   const [quantity, setQuantity] = useState("1");
   const [grossPrice, setGrossPrice] = useState("");
   const [discount, setDiscount] = useState("0");
@@ -86,8 +90,8 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
     setOpen(next);
     if (next) {
       setSupplier(material.supplierDefault ?? "");
-      setWidthCm(fixedSheet ? String(material.sheetWidthCm) : "");
-      setHeightCm(fixedSheet ? String(material.sheetHeightCm) : "");
+      setWidthCm(fixedSheet ? String(material.sheetWidthCm) : pieceUnit ? "1" : "");
+      setHeightCm(fixedSheet ? String(material.sheetHeightCm) : pieceUnit ? "1" : "");
       setQuantity("1");
       setGrossPrice("");
       setDiscount("0");
@@ -155,7 +159,9 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
       toast.success("Compra registrada", {
         description: fixedSheet
           ? `${material.name}: costo promedio actualizado a ${formatMXN(preview.projectedCostPerSheet)}/hoja.`
-          : `${material.name}: costo promedio actualizado a ${formatMXN(preview.projectedWeightedAverageCostPerCm2 * 10_000)}/m2.`,
+          : pieceUnit
+            ? `${material.name}: costo promedio actualizado a ${formatMXN(preview.projectedWeightedAverageCostPerCm2)}/pieza.`
+            : `${material.name}: costo promedio actualizado a ${formatMXN(preview.projectedWeightedAverageCostPerCm2 * 10_000)}/m2.`,
       });
       setOpen(false);
       router.refresh();
@@ -203,7 +209,7 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
             />
           </div>
 
-          {fixedSheet ? null : (
+          {fixedSheet || pieceUnit ? null : (
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="purchase-width">Ancho (cm)</Label>
@@ -233,7 +239,9 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
           )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="purchase-quantity">{fixedSheet ? "¿Cuántas hojas?" : "Cantidad"}</Label>
+            <Label htmlFor="purchase-quantity">
+              {fixedSheet ? "¿Cuántas hojas?" : pieceUnit ? "¿Cuántas piezas?" : "Cantidad"}
+            </Label>
             <Input
               id="purchase-quantity"
               type="number"
@@ -305,6 +313,15 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
                   <span>Costo / hoja</span>
                   <span className="text-right tabular-nums text-foreground">{formatMXN(preview.costPerSheet, 4)}</span>
                 </div>
+              ) : pieceUnit ? (
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-muted-foreground">
+                  <span>Piezas compradas</span>
+                  <span className="text-right tabular-nums text-foreground">{qty}</span>
+                  <span>Precio final</span>
+                  <span className="text-right tabular-nums text-foreground">{formatMXN(preview.finalPrice)}</span>
+                  <span>Costo / pieza</span>
+                  <span className="text-right tabular-nums text-foreground">{formatMXN(preview.costPerCm2, 4)}</span>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-muted-foreground">
                   <span>Area por unidad</span>
@@ -328,7 +345,9 @@ export function PurchaseForm({ material, trigger }: PurchaseFormProps) {
               <p className="border-t border-border pt-2 font-medium text-primary">
                 {fixedSheet
                   ? `Despues de esta compra, tu costo promedio de este material cambiara de ${formatMXN(costPerSheet(material.weightedAverageCostPerCm2, material), 4)} a ${formatMXN(preview.projectedCostPerSheet, 4)} por hoja.`
-                  : `Despues de esta compra, tu costo promedio de este material cambiara de ${formatMXN(material.weightedAverageCostPerCm2, 4)} a ${formatMXN(preview.projectedWeightedAverageCostPerCm2, 4)} por cm2.`}
+                  : pieceUnit
+                    ? `Despues de esta compra, tu costo promedio de este material cambiara de ${formatMXN(material.weightedAverageCostPerCm2, 4)} a ${formatMXN(preview.projectedWeightedAverageCostPerCm2, 4)} por pieza.`
+                    : `Despues de esta compra, tu costo promedio de este material cambiara de ${formatMXN(material.weightedAverageCostPerCm2, 4)} a ${formatMXN(preview.projectedWeightedAverageCostPerCm2, 4)} por cm2.`}
               </p>
             </div>
           ) : null}

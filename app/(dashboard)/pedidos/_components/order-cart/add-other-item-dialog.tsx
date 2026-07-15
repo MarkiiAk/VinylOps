@@ -22,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { isPieceUnit } from "@/lib/sheet-units";
 import type { MaterialLite } from "./cart-types";
 
 function formatMXN(value: number) {
@@ -75,6 +77,7 @@ type CostFieldKey = (typeof COST_FIELDS)[number][0];
  */
 export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps) {
   const [open, setOpen] = useState(false);
+  const [showZeroCostConfirm, setShowZeroCostConfirm] = useState(false);
   const [description, setDescription] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unitPrice, setUnitPrice] = useState("");
@@ -93,6 +96,7 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
 
   const selectedMaterial = materials.find((m) => m.id === materialId);
   const hasFixedSheet = Boolean(selectedMaterial?.sheetWidthCm && selectedMaterial?.sheetHeightCm);
+  const pieceUnit = Boolean(selectedMaterial && isPieceUnit(selectedMaterial));
 
   const parsedQuantity = parseInt(quantity || "0", 10) || 0;
   const parsedUnitPrice = Number(unitPrice) || 0;
@@ -107,6 +111,10 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
       const parsedSheets = Number(sheets) || 0;
       if (parsedSheets <= 0) return undefined;
       return parsedSheets * (selectedMaterial.sheetWidthCm as number) * (selectedMaterial.sheetHeightCm as number);
+    }
+    if (pieceUnit) {
+      const parsedPieces = Number(sheets) || 0;
+      return parsedPieces > 0 ? parsedPieces : undefined;
     }
     const parsedArea = Number(manualAreaCm2) || 0;
     return parsedArea > 0 ? parsedArea : undefined;
@@ -130,16 +138,7 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
     });
   }
 
-  function handleAdd() {
-    if (!description.trim() || parsedQuantity <= 0 || parsedUnitPrice < 0) return;
-
-    if (!hasAnyDeclaredCost) {
-      const confirmed = window.confirm(
-        "No declaraste ningún costo (material, tinta, luz, desgaste, merma, bolsa, etiquetita, mano de obra) para esta línea. Su ganancia se calculará como si costara $0 de producirla. ¿Continuar de todas formas?"
-      );
-      if (!confirmed) return;
-    }
-
+  function commitAdd() {
     const totalAreaCm2 = computeTotalAreaCm2();
 
     onAdd({
@@ -152,7 +151,19 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
       ...parsedCosts,
     });
     setOpen(false);
+    setShowZeroCostConfirm(false);
     reset();
+  }
+
+  function handleAdd() {
+    if (!description.trim() || parsedQuantity <= 0 || parsedUnitPrice < 0) return;
+
+    if (!hasAnyDeclaredCost) {
+      setShowZeroCostConfirm(true);
+      return;
+    }
+
+    commitAdd();
   }
 
   const canAdd = description.trim().length > 0 && parsedQuantity > 0 && unitPrice !== "" && parsedUnitPrice >= 0;
@@ -262,6 +273,18 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
                   onChange={(e) => setSheets(e.target.value)}
                 />
               </div>
+            ) : pieceUnit ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="other-pieces">¿Cuántas piezas en total?</Label>
+                <Input
+                  id="other-pieces"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={sheets}
+                  onChange={(e) => setSheets(e.target.value)}
+                />
+              </div>
             ) : (
               <div className="space-y-1.5">
                 <Label htmlFor="other-area">Área total usada (cm²)</Label>
@@ -318,6 +341,14 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
           </Button>
         </DialogFooter>
       </DialogContent>
+      <ConfirmDialog
+        open={showZeroCostConfirm}
+        onOpenChange={setShowZeroCostConfirm}
+        title="Línea sin costo declarado"
+        description="No declaraste ningún costo (material, tinta, luz, desgaste, merma, bolsa, etiquetita, mano de obra) para esta línea. Su ganancia se calculará como si costara $0 de producirla. ¿Continuar de todas formas?"
+        confirmLabel="Continuar"
+        onConfirm={commitAdd}
+      />
     </Dialog>
   );
 }

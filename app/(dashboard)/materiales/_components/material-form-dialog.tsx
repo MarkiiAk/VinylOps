@@ -34,6 +34,7 @@ export interface MaterialFormValues {
   purchaseUrl: string | null;
   sheetWidthCm: number | null;
   sheetHeightCm: number | null;
+  unit: string;
 }
 
 interface MaterialFormDialogProps {
@@ -55,6 +56,7 @@ const emptyForm = {
   isSoldBySheet: false,
   sheetWidthCm: "",
   sheetHeightCm: "",
+  isPieceUnit: false,
 };
 
 function buildFormState(material: MaterialFormValues | undefined) {
@@ -72,6 +74,7 @@ function buildFormState(material: MaterialFormValues | undefined) {
     isSoldBySheet: material.sheetWidthCm != null && material.sheetHeightCm != null,
     sheetWidthCm: material.sheetWidthCm != null ? String(material.sheetWidthCm) : "",
     sheetHeightCm: material.sheetHeightCm != null ? String(material.sheetHeightCm) : "",
+    isPieceUnit: material.unit === "pieza",
   };
 }
 
@@ -99,8 +102,11 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
     setSubmitting(true);
     try {
       const lowStockThresholdCm2 = parseFloat(form.lowStockThresholdCm2 || "0") || 0;
-      const sheetWidthCm = form.isSoldBySheet ? parseFloat(form.sheetWidthCm || "0") || undefined : undefined;
-      const sheetHeightCm = form.isSoldBySheet ? parseFloat(form.sheetHeightCm || "0") || undefined : undefined;
+      const sheetWidthCm =
+        form.isSoldBySheet && !form.isPieceUnit ? parseFloat(form.sheetWidthCm || "0") || undefined : undefined;
+      const sheetHeightCm =
+        form.isSoldBySheet && !form.isPieceUnit ? parseFloat(form.sheetHeightCm || "0") || undefined : undefined;
+      const unit = form.isPieceUnit ? "pieza" : "cm2";
 
       if (isEdit && material) {
         await updateMaterial(material.id, {
@@ -114,6 +120,7 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
           purchaseUrl: form.purchaseUrl,
           sheetWidthCm: sheetWidthCm ?? null,
           sheetHeightCm: sheetHeightCm ?? null,
+          unit,
         });
         toast.success("Material actualizado", { description: form.name });
       } else {
@@ -129,6 +136,7 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
           purchaseUrl: form.purchaseUrl || undefined,
           sheetWidthCm,
           sheetHeightCm,
+          unit,
         });
         toast.success("Material creado", { description: form.name });
       }
@@ -280,11 +288,12 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
               <Switch
                 id="material-sold-by-sheet"
                 checked={form.isSoldBySheet}
+                disabled={form.isPieceUnit}
                 onCheckedChange={(checked) => setForm((f) => ({ ...f, isSoldBySheet: checked }))}
               />
             </div>
 
-            {form.isSoldBySheet ? (
+            {form.isSoldBySheet && !form.isPieceUnit ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="material-sheet-width">Ancho de hoja (cm)</Label>
@@ -312,6 +321,23 @@ export function MaterialFormDialog({ material, trigger }: MaterialFormDialogProp
                 </div>
               </div>
             ) : null}
+          </div>
+
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-input p-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="material-piece-unit">¿Se compra/vende por pieza?</Label>
+              <p className="text-xs text-muted-foreground">
+                Ej. bolsas de Pringles para reempaquetar, tags de acrílico. No se mide por área ni por hoja — se
+                cuenta directo (compras 40 piezas, vendes 1, quedan 39).
+              </p>
+            </div>
+            <Switch
+              id="material-piece-unit"
+              checked={form.isPieceUnit}
+              onCheckedChange={(checked) =>
+                setForm((f) => ({ ...f, isPieceUnit: checked, isSoldBySheet: checked ? false : f.isSoldBySheet }))
+              }
+            />
           </div>
 
           <div className="space-y-1.5">

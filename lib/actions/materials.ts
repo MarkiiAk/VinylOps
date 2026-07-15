@@ -75,6 +75,8 @@ export interface CreateMaterialInput {
   purchaseUrl?: string
   sheetWidthCm?: number
   sheetHeightCm?: number
+  /** "cm2" (default, área) o "pieza" (se compra/vende por unidad — ej. Pringles, tags — ver lib/sheet-units.ts). */
+  unit?: string
 }
 
 function validateMaterialInput(data: { name: string; category: string; lowStockThresholdCm2?: number }) {
@@ -106,6 +108,7 @@ export async function createMaterial(data: CreateMaterialInput) {
       purchaseUrl: data.purchaseUrl?.trim() || undefined,
       sheetWidthCm: data.sheetWidthCm ?? undefined,
       sheetHeightCm: data.sheetHeightCm ?? undefined,
+      unit: data.unit ?? 'cm2',
       totalAreaCm2: 0,
       totalValue: 0,
       weightedAverageCostPerCm2: 0,
@@ -130,6 +133,7 @@ export interface UpdateMaterialInput {
   purchaseUrl?: string
   sheetWidthCm?: number | null
   sheetHeightCm?: number | null
+  unit?: string
 }
 
 export async function updateMaterial(id: string, data: UpdateMaterialInput) {
@@ -154,6 +158,7 @@ export async function updateMaterial(id: string, data: UpdateMaterialInput) {
       ...(data.purchaseUrl !== undefined ? { purchaseUrl: data.purchaseUrl.trim() || null } : {}),
       ...(data.sheetWidthCm !== undefined ? { sheetWidthCm: data.sheetWidthCm } : {}),
       ...(data.sheetHeightCm !== undefined ? { sheetHeightCm: data.sheetHeightCm } : {}),
+      ...(data.unit !== undefined ? { unit: data.unit } : {}),
     },
   })
 

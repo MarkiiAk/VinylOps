@@ -1,7 +1,7 @@
 "use client";
 
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
-import { costPerSheet, hasFixedSheet, type SheetDimensions } from "@/lib/sheet-units";
+import { costPerSheet, hasFixedSheet, isPieceUnit, type SheetDimensions } from "@/lib/sheet-units";
 
 interface PurchasePoint {
   id: string;
@@ -12,6 +12,7 @@ interface PurchasePoint {
 interface MaterialCostChartProps extends SheetDimensions {
   purchases: PurchasePoint[];
   currentWeightedAverageCostPerCm2: number;
+  unit: string;
 }
 
 function formatMXN(value: number, maximumFractionDigits = 2) {
@@ -35,11 +36,13 @@ export function MaterialCostChart({
   currentWeightedAverageCostPerCm2,
   sheetWidthCm,
   sheetHeightCm,
+  unit,
 }: MaterialCostChartProps) {
   const fixedSheet = hasFixedSheet({ sheetWidthCm, sheetHeightCm });
+  const pieceUnit = isPieceUnit({ unit });
   const toDisplayCost = (costPerCm2: number) =>
     fixedSheet ? costPerSheet(costPerCm2, { sheetWidthCm, sheetHeightCm }) : costPerCm2;
-  const displayDigits = fixedSheet ? 2 : 4;
+  const displayDigits = fixedSheet || pieceUnit ? 2 : 4;
 
   const data = [...purchases]
     .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime())
@@ -80,7 +83,11 @@ export function MaterialCostChart({
               }}
               formatter={(value) => [
                 formatMXN(Number(value), displayDigits),
-                fixedSheet ? "Costo / hoja de esta compra" : "Costo / cm2 de esta compra",
+                fixedSheet
+                  ? "Costo / hoja de esta compra"
+                  : pieceUnit
+                    ? "Costo / pieza de esta compra"
+                    : "Costo / cm2 de esta compra",
               ]}
             />
             <Line
@@ -95,12 +102,13 @@ export function MaterialCostChart({
         </ResponsiveContainer>
       </div>
       <p className="text-[0.7rem] text-muted-foreground">
-        Cada punto es el costo {fixedSheet ? "por hoja" : "/cm2"} de una compra individual, no el promedio
-        acumulado. El promedio ponderado vigente del material (estado actual, no historico) es{" "}
+        Cada punto es el costo {fixedSheet ? "por hoja" : pieceUnit ? "por pieza" : "/cm2"} de una compra
+        individual, no el promedio acumulado. El promedio ponderado vigente del material (estado actual, no
+        historico) es{" "}
         <span className="font-medium text-foreground">
           {formatMXN(toDisplayCost(currentWeightedAverageCostPerCm2), displayDigits)}
         </span>{" "}
-        {fixedSheet ? "por hoja." : "por cm2."}
+        {fixedSheet ? "por hoja." : pieceUnit ? "por pieza." : "por cm2."}
       </p>
     </div>
   );
