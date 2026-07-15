@@ -187,7 +187,11 @@ export function ExpenseFormDialog({ expense, trigger }: ExpenseFormDialogProps) 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="expense-category">Categoría</Label>
-              <Select value={form.category} onValueChange={(value) => setForm((f) => ({ ...f, category: value ?? f.category }))}>
+              <Select
+                value={form.category}
+                items={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                onValueChange={(value) => setForm((f) => ({ ...f, category: value ?? f.category }))}
+              >
                 <SelectTrigger id="expense-category" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -202,7 +206,11 @@ export function ExpenseFormDialog({ expense, trigger }: ExpenseFormDialogProps) 
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="expense-method">Método</Label>
-              <Select value={form.method} onValueChange={(value) => setForm((f) => ({ ...f, method: value ?? f.method }))}>
+              <Select
+                value={form.method}
+                items={EXPENSE_METHODS.map((m) => ({ value: m, label: m }))}
+                onValueChange={(value) => setForm((f) => ({ ...f, method: value ?? f.method }))}
+              >
                 <SelectTrigger id="expense-method" className="w-full">
                   <SelectValue />
                 </SelectTrigger>

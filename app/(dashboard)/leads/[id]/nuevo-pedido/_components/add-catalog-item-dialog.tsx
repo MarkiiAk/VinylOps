@@ -97,7 +97,14 @@ export function AddCatalogItemDialog({ catalogItems, onAdd }: AddCatalogItemDial
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Producto</Label>
-            <Select value={catalogItemId || null} onValueChange={handleSelectItem}>
+            <Select
+              value={catalogItemId || null}
+              items={catalogItems.map((item) => ({
+                value: item.id,
+                label: `${item.name} · ${formatMXN(item.unitPrice)}`,
+              }))}
+              onValueChange={handleSelectItem}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Selecciona un producto" />
               </SelectTrigger>

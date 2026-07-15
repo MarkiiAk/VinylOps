@@ -156,7 +156,15 @@ export function RegisterPaymentDialog({ orderId }: RegisterPaymentDialogProps) {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="payment-type">Tipo</Label>
-              <Select value={type} onValueChange={(value) => setType((value as PaymentType) ?? "Anticipo")}>
+              <Select
+                value={type}
+                items={[
+                  { value: "Anticipo", label: "Anticipo" },
+                  { value: "Liquidacion", label: "Liquidación" },
+                  { value: "Otro", label: "Otro" },
+                ]}
+                onValueChange={(value) => setType((value as PaymentType) ?? "Anticipo")}
+              >
                 <SelectTrigger id="payment-type" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -172,7 +180,16 @@ export function RegisterPaymentDialog({ orderId }: RegisterPaymentDialogProps) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="payment-method">Método</Label>
-              <Select value={method} onValueChange={(value) => setMethod((value as PaymentMethod) ?? "Efectivo")}>
+              <Select
+                value={method}
+                items={[
+                  { value: "Efectivo", label: "Efectivo" },
+                  { value: "Transferencia", label: "Transferencia" },
+                  { value: "Tarjeta", label: "Tarjeta" },
+                  { value: "Otro", label: "Otro" },
+                ]}
+                onValueChange={(value) => setMethod((value as PaymentMethod) ?? "Efectivo")}
+              >
                 <SelectTrigger id="payment-method" className="w-full">
                   <SelectValue />
                 </SelectTrigger>

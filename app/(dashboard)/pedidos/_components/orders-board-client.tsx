@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ORDER_STATUS_OPTIONS } from "@/components/order-status-badge";
 import { OrderStatusSelect } from "./order-status-select";
 import { RegisterPaymentDialog } from "./register-payment-dialog";
+import { DeleteOrderButton } from "../[id]/_components/delete-order-button";
 
 function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
@@ -101,6 +102,12 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
                       className="min-w-[7.5rem] flex-1"
                     />
                     <RegisterPaymentDialog orderId={order.id} />
+                    <DeleteOrderButton
+                      orderId={order.id}
+                      leadId={order.lead.id}
+                      interest={order.interest}
+                      stayOnPage
+                    />
                   </div>
                 </div>
               ))}

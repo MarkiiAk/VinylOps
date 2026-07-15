@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SELECTABLE_ORDER_STATUS_OPTIONS } from "@/components/order-status-badge";
+import { ORDER_STATUS_OPTIONS, SELECTABLE_ORDER_STATUS_OPTIONS } from "@/components/order-status-badge";
 import { updateOrderStatus } from "@/lib/actions/orders";
 
 interface OrderStatusSelectProps {
@@ -64,7 +64,7 @@ export function OrderStatusSelect({ orderId, status, size = "sm", className }: O
   }
 
   return (
-    <Select value={status} onValueChange={handleChange} disabled={isPending}>
+    <Select value={status} items={ORDER_STATUS_OPTIONS} onValueChange={handleChange} disabled={isPending}>
       <SelectTrigger size={size} className={className ?? "w-40"}>
         <SelectValue />
       </SelectTrigger>

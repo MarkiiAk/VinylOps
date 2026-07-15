@@ -223,6 +223,10 @@ export function AddOtherItemDialog({ materials, onAdd }: AddOtherItemDialogProps
             <Label htmlFor="other-material">Material usado (opcional, para descontar inventario)</Label>
             <Select
               value={materialId}
+              items={[
+                { value: NONE_MATERIAL, label: "Ninguno" },
+                ...materials.map((material) => ({ value: material.id, label: material.name })),
+              ]}
               onValueChange={(value) => {
                 setMaterialId(value ?? NONE_MATERIAL);
                 setSheets("1");

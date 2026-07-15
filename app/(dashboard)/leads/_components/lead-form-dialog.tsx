@@ -151,7 +151,7 @@ export function LeadFormDialog({ lead }: LeadFormDialogProps) {
 
           <div className="space-y-1.5">
             <Label htmlFor="lead-status">Status</Label>
-            <Select value={status} onValueChange={(value) => setStatus(value ?? "Contacto")}>
+            <Select value={status} items={LEAD_STATUS_OPTIONS} onValueChange={(value) => setStatus(value ?? "Contacto")}>
               <SelectTrigger id="lead-status" className="w-full">
                 <SelectValue />
               </SelectTrigger>

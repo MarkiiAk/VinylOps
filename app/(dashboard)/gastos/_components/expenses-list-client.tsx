@@ -96,7 +96,7 @@ export function ExpensesListClient({ expenses }: { expenses: ExpenseRow[] }) {
       <div className="glass-panel flex flex-wrap items-end gap-3 rounded-xl p-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Periodo</Label>
-          <Select value={range} onValueChange={(v) => setRange((v as DateRangePreset) ?? "mes")}>
+          <Select value={range} items={RANGE_OPTIONS} onValueChange={(v) => setRange((v as DateRangePreset) ?? "mes")}>
             <SelectTrigger className="w-44">
               <SelectValue />
             </SelectTrigger>
@@ -111,7 +111,11 @@ export function ExpensesListClient({ expenses }: { expenses: ExpenseRow[] }) {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Categoría</Label>
-          <Select value={category} onValueChange={(v) => setCategory(v ?? ALL_CATEGORIES)}>
+          <Select
+            value={category}
+            items={[{ value: ALL_CATEGORIES, label: "Todas" }, ...EXPENSE_CATEGORIES.map((c) => ({ value: c, label: c }))]}
+            onValueChange={(v) => setCategory(v ?? ALL_CATEGORIES)}
+          >
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>

@@ -211,7 +211,11 @@ export function FinancialReportClient({
       <div className="glass-panel flex flex-wrap items-end gap-3 rounded-xl p-4">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Periodo</Label>
-          <Select value={rangeOption} onValueChange={(v) => setRangeOption((v as DateRangePreset | "personalizado") ?? "mes")}>
+          <Select
+            value={rangeOption}
+            items={RANGE_OPTIONS}
+            onValueChange={(v) => setRangeOption((v as DateRangePreset | "personalizado") ?? "mes")}
+          >
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>

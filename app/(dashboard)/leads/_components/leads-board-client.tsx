@@ -117,6 +117,7 @@ export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
               <div className="mt-1 flex items-center justify-between gap-2">
                 <Select
                   value={lead.status}
+                  items={LEAD_STATUS_OPTIONS}
                   onValueChange={(value) => handleStatusChange(lead, value)}
                   disabled={isPending}
                 >

@@ -11,15 +11,18 @@ interface DeleteOrderButtonProps {
   orderId: string;
   leadId: string;
   interest: string;
+  /** true = no navega a ningún lado al terminar, solo refresca (para usarlo en listas como el kanban, donde no tiene sentido salir de la pantalla). Default: navega a /leads/[leadId]. */
+  stayOnPage?: boolean;
 }
 
 /**
  * Elimina el pedido completo (pagos/líneas en cascada, inventario
  * consumido se le regresa al material — ver deleteOrder en
  * lib/actions/orders.ts). Confirm simple porque es una acción destructiva
- * sin deshacer; redirige de vuelta al lead al terminar.
+ * sin deshacer; redirige de vuelta al lead al terminar, salvo que se pida
+ * quedarse en la pantalla actual (ver stayOnPage).
  */
-export function DeleteOrderButton({ orderId, leadId, interest }: DeleteOrderButtonProps) {
+export function DeleteOrderButton({ orderId, leadId, interest, stayOnPage = false }: DeleteOrderButtonProps) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -33,7 +36,9 @@ export function DeleteOrderButton({ orderId, leadId, interest }: DeleteOrderButt
       try {
         await deleteOrder(orderId);
         toast.success("Pedido eliminado");
-        router.push(`/leads/${leadId}`);
+        if (!stayOnPage) {
+          router.push(`/leads/${leadId}`);
+        }
         router.refresh();
       } catch (error) {
         toast.error("No se pudo eliminar el pedido", {
