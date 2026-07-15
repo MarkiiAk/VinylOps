@@ -132,7 +132,6 @@ export async function createPurchase(input: PurchaseInput) {
   })
 
   revalidatePath('/materiales')
-  revalidatePath('/inventario')
   revalidatePath('/')
 
   return result

@@ -8,7 +8,6 @@ import { useTheme } from "next-themes";
 import {
   Layers,
   Kanban,
-  Calendar,
   Settings,
   Plus,
   Sparkles,
@@ -16,7 +15,6 @@ import {
   Moon,
   Package,
   MessageCircleMore,
-  Boxes,
   MoreHorizontal,
   Receipt,
   LineChart,
@@ -32,22 +30,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// Simplificado a proposito (2026-07, feedback del dueño: "todo tiene 1000000
-// cosas que no necesito"): el uso diario real son 3 pantallas — Catalogo
-// (que se vende), Leads (seguimiento antes de la venta) y Pedidos (kanban
-// de produccion + pagos). Todo lo demas (Materiales, Inventario, Calendario,
-// Gastos, Reportes, Configuracion) sigue existiendo tal cual, probado y
-// funcional — solo se movio a "Mas" para no estorbar en el uso diario.
+// Reestructurado a proposito (2026-07, feedback del dueño: mover pantallas a
+// "Mas" era maquillaje, no una simplificacion real). Se fusionaron rutas que
+// eran la misma cosa duplicada: Inventario vivia dentro de Materiales (misma
+// tabla, un filtro) y Calendario dentro de Pedidos (misma Order.deliveryDate,
+// sin modelo propio) — ver /pedidos?vista=calendario. El uso diario real
+// (Pedidos, Leads, Catalogo, Materiales) queda arriba; lo genuinamente global
+// del negocio (Gastos, Reportes, Configuracion) abajo en "Mas".
 const NAV_ITEMS = [
-  { href: "/catalogo", label: "Catalogo", icon: Package },
-  { href: "/leads", label: "Leads", icon: MessageCircleMore },
   { href: "/pedidos", label: "Pedidos", icon: Kanban },
+  { href: "/leads", label: "Leads", icon: MessageCircleMore },
+  { href: "/catalogo", label: "Catalogo", icon: Package },
+  { href: "/materiales", label: "Materiales", icon: Layers },
 ];
 
 const MORE_ITEMS = [
-  { href: "/materiales", label: "Materiales", icon: Layers },
-  { href: "/inventario", label: "Inventario", icon: Boxes },
-  { href: "/calendario", label: "Calendario", icon: Calendar },
   { href: "/gastos", label: "Gastos", icon: Receipt },
   { href: "/reportes/financiero", label: "Reportes", icon: LineChart },
   { href: "/configuracion", label: "Configuracion", icon: Settings },

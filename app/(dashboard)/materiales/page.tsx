@@ -4,13 +4,13 @@ import { MaterialFormDialog } from "./_components/material-form-dialog";
 import { MaterialsListClient } from "./_components/materials-list-client";
 
 /**
- * Catalogo de materiales: TODOS los tipos de material (con o sin inventario
- * trackeado), sin importar isInventoryTracked. Es el catalogo de referencia
- * de costo/proveedor — el stock real (area disponible, valor de inventario,
- * alerta de stock bajo) vive en /inventario, no aqui.
+ * Materiales: catalogo + inventario en una sola pantalla. Antes eran dos
+ * rutas separadas (/materiales y /inventario) sobre la misma tabla,
+ * distinguidas solo por isInventoryTracked — se fusionaron porque era la
+ * misma pantalla disfrazada de dos.
  *
- * Server Component: carga TODOS los materiales (activos + archivados) una
- * sola vez y delega busqueda/filtros/toggle de archivados al client
+ * Server Component: carga TODOS los materiales (activos + archivados, con o
+ * sin inventario trackeado) una sola vez y delega busqueda/filtros al client
  * component, que filtra en memoria sin volver a pegarle al servidor por
  * cada tecla.
  */
@@ -21,7 +21,7 @@ export default async function MaterialesPage() {
     <div className="space-y-6">
       <SectionHeading
         title="Materiales"
-        subtitle="Catalogo de tipos de material: costo de referencia, proveedor y link de compra. El stock real esta en Inventario."
+        subtitle="Catalogo de materiales e inventario real: costo de referencia, stock disponible y compras."
         action={<MaterialFormDialog />}
       />
 

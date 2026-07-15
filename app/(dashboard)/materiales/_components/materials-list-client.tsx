@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Archive, ArchiveRestore, ExternalLink, Layers, RefreshCw } from "lucide-react";
+import { AlertTriangle, Archive, ArchiveRestore, ExternalLink, Layers, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
@@ -28,13 +28,38 @@ function formatMXN(value: number, maximumFractionDigits = 2) {
   }).format(value);
 }
 
+function formatM2(cm2: number) {
+  return `${(cm2 / 10_000).toFixed(2)} m2`;
+}
+
+function isLowStock(material: Material) {
+  return material.lowStockThresholdCm2 > 0 && material.totalAreaCm2 <= material.lowStockThresholdCm2;
+}
+
+function sheetAreaCm2(material: { sheetWidthCm: number; sheetHeightCm: number }) {
+  return material.sheetWidthCm * material.sheetHeightCm;
+}
+
+/** Hojas disponibles, redondeado a 1 decimal — Marco quiere ver "97 hojas", no un area en cm2/m2. */
+function sheetsAvailable(material: Material & { sheetWidthCm: number; sheetHeightCm: number }) {
+  return Math.round((material.totalAreaCm2 / sheetAreaCm2(material)) * 10) / 10;
+}
+
+function formatSheets(count: number) {
+  const rounded = Math.round(count * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} hoja${rounded === 1 ? "" : "s"}`;
+}
+
 /**
- * Catalogo de TODOS los materiales (con o sin inventario trackeado). Muestra
- * solo datos de catalogo: costo de referencia, proveedor, link de compra.
- * Nada de area disponible / valor de inventario / stock bajo — eso vive en
- * /inventario. "Actualizar costo" abre el mismo dialog de material (edicion)
- * ya que el costo de referencia de un material sin tracking se ajusta a mano,
- * no vía una compra que mueva stock.
+ * Catalogo + inventario de materiales en una sola pantalla (antes eran dos
+ * rutas separadas sobre la misma tabla, distinguidas solo por
+ * isInventoryTracked). Cada tarjeta muestra siempre el costo de referencia;
+ * si el material lleva inventario real, ademas muestra hojas/area
+ * disponible, valor de inventario y alerta de stock bajo, y el boton de
+ * accion es "Agregar compra" (repone stock). Si es de costo de referencia
+ * (se maquila o se pide bajo demanda, sin stock propio), el boton es
+ * "Actualizar costo" (mismo dialog, solo recalcula el promedio ponderado sin
+ * sumar stock).
  */
 export function MaterialsListClient({ materials }: MaterialsListClientProps) {
   const router = useRouter();
@@ -142,10 +167,36 @@ function CatalogMaterialCard({
           <Badge variant="outline" className="shrink-0 gap-1 text-muted-foreground">
             Costo de referencia
           </Badge>
-        ) : null}
+        ) : isLowStock(material) ? (
+          <Badge className="shrink-0 gap-1 bg-warning/15 text-warning">
+            <AlertTriangle className="size-3" />
+            Stock bajo
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="shrink-0 gap-1 text-success">
+            <Layers className="size-3" />
+            OK
+          </Badge>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+        {material.isInventoryTracked ? (
+          <>
+            <span className="text-muted-foreground">
+              {hasFixedSheet(material) ? "Hojas disponibles" : "Area disponible"}
+            </span>
+            <span className="text-right tabular-nums text-foreground">
+              {hasFixedSheet(material)
+                ? formatSheets(sheetsAvailable(material as Material & { sheetWidthCm: number; sheetHeightCm: number }))
+                : formatM2(material.totalAreaCm2)}
+            </span>
+            <span className="text-muted-foreground">Valor inventario</span>
+            <span className="text-right tabular-nums font-medium text-foreground">
+              {formatMXN(material.totalValue)}
+            </span>
+          </>
+        ) : null}
         {hasFixedSheet(material) ? (
           <>
             <span className="text-muted-foreground">Costo / hoja</span>
@@ -208,7 +259,9 @@ function CatalogMaterialCard({
             </Button>
           }
         />
-        {!material.isInventoryTracked ? (
+        {material.isInventoryTracked ? (
+          <PurchaseForm material={material} />
+        ) : (
           <PurchaseForm
             material={material}
             trigger={
@@ -218,7 +271,7 @@ function CatalogMaterialCard({
               </Button>
             }
           />
-        ) : null}
+        )}
         <Button
           size="sm"
           variant="ghost"

@@ -15,6 +15,10 @@ function formatDate(iso: string) {
   return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date(iso));
 }
 
+function isPendingDelivery(status: string) {
+  return status !== "Entregado" && status !== "Cerrado";
+}
+
 export interface OrderCardData {
   id: string;
   interest: string;
@@ -25,10 +29,11 @@ export interface OrderCardData {
 }
 
 /**
- * Tablero Kanban de pedidos: 5 columnas por Order.status. Cada tarjeta
- * muestra lead/interés/total/entrega, con Select inline para cambiar de fase
- * (mismo patrón useTransition + server action + toast + router.refresh() que
- * leads-board-client.tsx) y un dialog para registrar un pago.
+ * Tablero Kanban de pedidos: una columna por Order.status (ver
+ * ORDER_STATUS_OPTIONS). Cada tarjeta muestra lead/interés/total/entrega,
+ * con Select inline para cambiar de fase (mismo patrón useTransition +
+ * server action + toast + router.refresh() que leads-board-client.tsx) y un
+ * dialog para registrar un pago.
  */
 export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
   if (orders.length === 0) {
@@ -42,7 +47,7 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {ORDER_STATUS_OPTIONS.map((column) => {
         const columnOrders = orders.filter((order) => order.status === column.value);
         return (
@@ -76,12 +81,12 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
                     {order.deliveryDate ? (
                       <span
                         className={`text-xs ${
-                          order.status !== "Entregado" && new Date(order.deliveryDate) < new Date(new Date().toDateString())
+                          isPendingDelivery(order.status) && new Date(order.deliveryDate) < new Date(new Date().toDateString())
                             ? "font-medium text-destructive"
                             : "text-muted-foreground"
                         }`}
                       >
-                        {order.status !== "Entregado" && new Date(order.deliveryDate) < new Date(new Date().toDateString())
+                        {isPendingDelivery(order.status) && new Date(order.deliveryDate) < new Date(new Date().toDateString())
                           ? "Atrasado · "
                           : "Entrega: "}
                         {formatDate(order.deliveryDate)}

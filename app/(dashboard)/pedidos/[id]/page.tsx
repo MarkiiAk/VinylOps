@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Receipt, ShoppingCart } from "lucide-react";
+import {
+  ArrowLeft,
+  ShoppingCart,
+  UserRound,
+  Palette,
+  HandCoins,
+  PackageCheck,
+  Calculator,
+} from "lucide-react";
 import { SectionHeading } from "@/components/section-heading";
 import { EmptyState } from "@/components/empty-state";
+import { OrderStatusBadge } from "@/components/order-status-badge";
 import {
   Table,
   TableBody,
@@ -12,10 +21,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getOrder } from "@/lib/actions/orders";
+import type { Payment } from "@/lib/generated/prisma/client";
 import { OrderStatusSelect } from "../_components/order-status-select";
 import { RegisterPaymentDialog } from "../_components/register-payment-dialog";
 import { OrderDeliveryDateEditor } from "./_components/order-delivery-date-editor";
 import { DeleteOrderButton } from "./_components/delete-order-button";
+import { CloseOrderButton } from "./_components/close-order-button";
+import { OrderFlowStepper } from "./_components/order-flow-stepper";
 
 function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
@@ -31,10 +43,40 @@ interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+const STATUS_ORDER = ["Disenando", "DisenoAprobado", "Maquilando", "Completado", "Entregado", "Cerrado"];
+
+type OrderLineItem = Awaited<ReturnType<typeof getOrder>>["lineItems"][number];
+
+function statusIndex(status: string) {
+  const i = STATUS_ORDER.indexOf(status);
+  return i === -1 ? 0 : i;
+}
+
+function PaymentRow({ payment }: { payment: Payment }) {
+  return (
+    <div key={payment.id} className="flex items-center justify-between gap-4 py-2">
+      <div className="min-w-0 space-y-0.5">
+        <p className="text-sm font-medium text-foreground">
+          {payment.type === "Anticipo" ? "Anticipo" : payment.type === "Liquidacion" ? "Liquidación" : "Otro"}
+          <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {payment.method}</span>
+        </p>
+        <p className="truncate text-xs text-muted-foreground">
+          {formatDate(payment.paidAt)}
+          {payment.notes ? ` · ${payment.notes}` : ""}
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-medium tabular-nums text-success">{formatMXN(payment.amount)}</span>
+    </div>
+  );
+}
+
 /**
- * Detalle de un pedido (Order): lead al que pertenece, líneas del carrito,
- * status de kanban con opción de cambiarlo, e historial de pagos. `getOrder`
- * ya incluye lead/lineItems/payments -> se traduce a notFound() si no existe.
+ * Detalle de un pedido, organizado literal como el flujo real del negocio
+ * (contacto -> diseño -> autorización -> trabajo -> anticipo -> entrega y
+ * liquidación -> corte de ganancia -> cierre) en vez de tarjetas sueltas.
+ * Cada sección usa exactamente los datos/acciones que ya existían
+ * (OrderStatusSelect, RegisterPaymentDialog, OrderDeliveryDateEditor),
+ * reposicionados bajo el paso que les corresponde.
  */
 export default async function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = await params;
@@ -50,19 +92,27 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const totalPaid = order.payments.reduce((sum, payment) => sum + payment.amount, 0);
   const balance = total - totalPaid;
 
-  // FASE 2 (V1): agregado del snapshot financiero congelado por línea (ver
-  // OrderLineItem en schema.prisma). Nullable porque líneas creadas antes de
-  // esta fase no tienen desglose — se suman como 0, nunca se re-derivan.
+  const anticipos = order.payments.filter((p) => p.type === "Anticipo");
+  const liquidaciones = order.payments.filter((p) => p.type === "Liquidacion");
+  const otrosPagos = order.payments.filter((p) => p.type !== "Anticipo" && p.type !== "Liquidacion");
+
+  // Paso 8 (corte de ganancia): el desglose por componente ya viene congelado
+  // por línea (unit*Cost en OrderLineItem, ver lib/costing.ts) — aquí solo se
+  // suma cantidad * costo unitario de cada componente a nivel pedido.
+  const sumComponent = (pick: (line: OrderLineItem) => number | null) =>
+    order.lineItems.reduce((sum, line) => sum + (pick(line) ?? 0) * line.quantity, 0);
+
+  const costoMaterial = sumComponent((l) => l.unitMaterialCost);
+  const costoTinta = sumComponent((l) => l.unitInkCost);
+  const costoLuz = sumComponent((l) => l.unitElectricityCost);
+  const costoDesgaste = sumComponent((l) => l.unitWearCost);
+  const costoMerma = sumComponent((l) => l.unitWasteCost);
+  const costoBolsaEtiqueta = sumComponent((l) => l.unitBagCost) + sumComponent((l) => l.unitLabelCost);
+
   const totalDirectCost = order.lineItems.reduce((sum, line) => sum + (line.totalDirectCost ?? 0), 0);
   const totalLabor = order.lineItems.reduce((sum, line) => sum + (line.totalLabor ?? 0), 0);
-  const grossProfit = total - totalDirectCost;
-  const grossMargin = total ? grossProfit / total : 0;
-  const profitAfterLabor = grossProfit - totalLabor;
-  const marginAfterLabor = total ? profitAfterLabor / total : 0;
+  const gananciaPedido = total - totalDirectCost - totalLabor;
 
-  // FASE 3 (V1): días restantes / atraso, calculados sobre la fecha
-  // compromiso (order.deliveryDate) vs. hoy — solo tiene sentido mientras el
-  // pedido no se haya entregado todavía.
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const commitmentDate = order.deliveryDate ? new Date(order.deliveryDate) : null;
@@ -70,7 +120,22 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const daysRemaining = commitmentDate
     ? Math.round((commitmentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
     : null;
-  const isLate = order.status !== "Entregado" && daysRemaining !== null && daysRemaining < 0;
+  const isDone = order.status === "Entregado" || order.status === "Cerrado";
+  const isLate = !isDone && daysRemaining !== null && daysRemaining < 0;
+
+  const idx = statusIndex(order.status);
+  const steps = [
+    { label: "Contacto", done: true },
+    { label: "Diseño", done: idx >= 1 },
+    { label: "Autorización", done: Boolean(order.designApprovedAt) },
+    { label: "Trabajo", done: idx >= 2 },
+    { label: "Anticipo", done: anticipos.length > 0 },
+    { label: "Entrega y liquidación", done: idx >= 4 && liquidaciones.length > 0 },
+    { label: "Corte de ganancia", done: idx >= 3 },
+    { label: "Cierre", done: order.status === "Cerrado" },
+  ];
+
+  const canClose = order.status === "Entregado" && balance <= 0;
 
   return (
     <div className="space-y-6">
@@ -89,27 +154,18 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             order.lead.phone || "Sin teléfono",
             `Creado ${formatDate(order.createdAt)}`,
           ].join(" · ")}
-          action={
-            <div className="flex items-center gap-2">
-              <OrderStatusSelect orderId={order.id} status={order.status} size="default" className="w-48" />
-              <DeleteOrderButton orderId={order.id} leadId={order.leadId} interest={order.interest} />
-            </div>
-          }
+          action={<DeleteOrderButton orderId={order.id} leadId={order.leadId} interest={order.interest} />}
         />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="glass-panel rounded-xl p-4">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Total del pedido</p>
-          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-foreground">
-            {formatMXN(total)}
-          </p>
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-foreground">{formatMXN(total)}</p>
         </div>
         <div className="glass-panel rounded-xl p-4">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Pagado</p>
-          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-success">
-            {formatMXN(totalPaid)}
-          </p>
+          <p className="mt-1 font-heading text-2xl font-semibold tabular-nums text-success">{formatMXN(totalPaid)}</p>
         </div>
         <div className="glass-panel rounded-xl p-4">
           <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Saldo pendiente</p>
@@ -119,83 +175,123 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         </div>
       </div>
 
-      <div className="glass-panel grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl p-4 text-sm sm:grid-cols-3 lg:grid-cols-6">
-        <div>
-          <p className="text-xs text-muted-foreground">Costo directo</p>
-          <p className="tabular-nums font-medium text-foreground">{formatMXN(totalDirectCost)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Ganancia bruta</p>
-          <p className="tabular-nums font-medium text-success">
-            {formatMXN(grossProfit)} <span className="text-xs text-muted-foreground">({(grossMargin * 100).toFixed(0)}%)</span>
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Mano de obra</p>
-          <p className="tabular-nums font-medium text-foreground">{formatMXN(totalLabor)}</p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Ganancia c/mano de obra</p>
-          <p className="tabular-nums font-medium text-success">
-            {formatMXN(profitAfterLabor)}{" "}
-            <span className="text-xs text-muted-foreground">({(marginAfterLabor * 100).toFixed(0)}%)</span>
-          </p>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <p className="text-xs text-muted-foreground">Estado de entrega</p>
-          <p className="font-medium text-foreground">{order.status === "Entregado" ? "Entregado" : "Pendiente"}</p>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Nota: utilidad no es lo mismo que efectivo — &quot;Ganancia&quot; aquí es sobre el total vendido, no sobre lo cobrado.
-      </p>
+      <OrderFlowStepper steps={steps} />
 
-      <div className="glass-panel grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl p-4 text-sm sm:grid-cols-4">
-        <div>
-          <p className="text-xs text-muted-foreground">Fecha de aprobación</p>
-          <p className="font-medium text-foreground">
-            {order.designApprovedAt ? formatDate(order.designApprovedAt) : "Sin aprobar"}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Fecha compromiso</p>
-          <p className="font-medium text-foreground">
-            {order.deliveryDate ? formatDate(order.deliveryDate) : "Sin definir"}
-            {order.deliveryDate ? (
-              <span className="ml-1 text-xs text-muted-foreground">
-                {order.deliveryDateIsManual ? "(manual)" : "(auto)"}
-              </span>
-            ) : null}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Días restantes</p>
-          <p className={`font-medium ${isLate ? "text-destructive" : "text-foreground"}`}>
-            {order.status === "Entregado"
-              ? "—"
-              : daysRemaining === null
-                ? "Sin fecha"
-                : isLate
-                  ? `Atrasado ${Math.abs(daysRemaining)} día(s)`
-                  : `${daysRemaining} día(s)`}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Entrega real</p>
-          <p className="font-medium text-foreground">{order.deliveredAt ? formatDate(order.deliveredAt) : "Pendiente"}</p>
-        </div>
-      </div>
+      {/* Paso 1: Contacto */}
+      <section className="glass-panel space-y-2 rounded-xl p-4">
+        <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
+          <UserRound className="size-4 text-primary" />
+          Paso 1 · Contacto
+        </h2>
+        <p className="text-sm text-foreground">
+          {order.lead.name || "Sin nombre"} · {order.lead.phone || "Sin teléfono"}
+        </p>
+        <Link href={`/leads/${order.leadId}`} className="inline-block text-xs text-primary hover:underline">
+          Ver historial completo de este cliente
+        </Link>
+      </section>
 
-      <OrderDeliveryDateEditor
-        orderId={order.id}
-        deliveryDate={order.deliveryDate ? order.deliveryDate.toISOString() : null}
-      />
-
-      {order.notes ? (
-        <div className="glass-panel rounded-xl p-4">
-          <p className="text-sm text-muted-foreground">{order.notes}</p>
+      {/* Pasos 2-4: Diseño, autorización y trabajo */}
+      <section className="glass-panel space-y-3 rounded-xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
+            <Palette className="size-4 text-primary" />
+            Pasos 2-4 · Diseño, autorización y trabajo
+          </h2>
+          <OrderStatusSelect orderId={order.id} status={order.status} size="default" className="w-48" />
         </div>
-      ) : null}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Fecha de aprobación</p>
+            <p className="font-medium text-foreground">
+              {order.designApprovedAt ? formatDate(order.designApprovedAt) : "Sin aprobar"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Fase actual</p>
+            <OrderStatusBadge status={order.status} />
+          </div>
+        </div>
+        {order.notes ? <p className="text-sm text-muted-foreground">{order.notes}</p> : null}
+      </section>
+
+      {/* Paso 5: Anticipo */}
+      <section className="glass-panel space-y-2 rounded-xl p-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
+            <HandCoins className="size-4 text-primary" />
+            Paso 5 · Anticipo
+          </h2>
+          <RegisterPaymentDialog orderId={order.id} />
+        </div>
+        {anticipos.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sin anticipo registrado todavía.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {anticipos.map((payment) => (
+              <PaymentRow key={payment.id} payment={payment} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Paso 6: Entrega y liquidación */}
+      <section className="glass-panel space-y-3 rounded-xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
+            <PackageCheck className="size-4 text-primary" />
+            Paso 6 · Entrega y liquidación
+          </h2>
+          <RegisterPaymentDialog orderId={order.id} />
+        </div>
+
+        <OrderDeliveryDateEditor
+          orderId={order.id}
+          deliveryDate={order.deliveryDate ? order.deliveryDate.toISOString() : null}
+        />
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Días restantes</p>
+            <p className={`font-medium ${isLate ? "text-destructive" : "text-foreground"}`}>
+              {isDone
+                ? "—"
+                : daysRemaining === null
+                  ? "Sin fecha"
+                  : isLate
+                    ? `Atrasado ${Math.abs(daysRemaining)} día(s)`
+                    : `${daysRemaining} día(s)`}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Entrega real</p>
+            <p className="font-medium text-foreground">
+              {order.deliveredAt ? formatDate(order.deliveredAt) : "Pendiente"}
+            </p>
+          </div>
+        </div>
+
+        {liquidaciones.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sin liquidación registrada todavía.</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {liquidaciones.map((payment) => (
+              <PaymentRow key={payment.id} payment={payment} />
+            ))}
+          </div>
+        )}
+
+        {otrosPagos.length > 0 ? (
+          <div className="space-y-1 border-t border-border pt-2">
+            <p className="text-xs text-muted-foreground">Otros pagos</p>
+            <div className="divide-y divide-border">
+              {otrosPagos.map((payment) => (
+                <PaymentRow key={payment.id} payment={payment} />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <div className="space-y-3">
         <h2 className="font-heading text-sm font-medium text-foreground">Líneas del carrito</h2>
@@ -235,35 +331,76 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         )}
       </div>
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-heading text-sm font-medium text-foreground">Historial de pagos</h2>
-          <RegisterPaymentDialog orderId={order.id} />
-        </div>
-        {order.payments.length === 0 ? (
-          <EmptyState icon={Receipt} title="Sin pagos registrados" description="Registra el primer anticipo o liquidación de este pedido." />
-        ) : (
-          <div className="glass-panel divide-y divide-border rounded-xl">
-            {order.payments.map((payment) => (
-              <div key={payment.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0 space-y-0.5">
-                  <p className="text-sm font-medium text-foreground">
-                    {payment.type === "Anticipo" ? "Anticipo" : payment.type === "Liquidacion" ? "Liquidación" : "Otro"}
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">· {payment.method}</span>
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {formatDate(payment.paidAt)}
-                    {payment.notes ? ` · ${payment.notes}` : ""}
-                  </p>
-                </div>
-                <span className="shrink-0 text-sm font-medium tabular-nums text-success">
-                  {formatMXN(payment.amount)}
-                </span>
-              </div>
-            ))}
+      {/* Paso 8: Corte de ganancia */}
+      <section className="glass-panel space-y-3 rounded-xl p-4">
+        <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-foreground">
+          <Calculator className="size-4 text-primary" />
+          Paso 8 · Corte de ganancia
+        </h2>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Venta total</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(total)}</p>
           </div>
-        )}
-      </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Material</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoMaterial)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Tinta</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoTinta)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Luz</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoLuz)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Desgaste</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoDesgaste)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Merma</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoMerma)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Bolsa/etiqueta</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(costoBolsaEtiqueta)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Mano de obra</p>
+            <p className="tabular-nums font-medium text-foreground">{formatMXN(totalLabor)}</p>
+          </div>
+        </div>
+        <div className="border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">
+            Ganancia de este pedido (venta − material/maquila − mano de obra)
+          </p>
+          <p className="font-heading text-2xl font-semibold text-success">{formatMXN(gananciaPedido)}</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          No incluye gasto operativo del negocio (luz de la casa, herramientas, etc.) — eso se ve agregado en
+          Reportes, no repartido por pedido.
+        </p>
+      </section>
+
+      {/* Paso 9: Cierre */}
+      <section className="glass-panel flex flex-wrap items-center justify-between gap-3 rounded-xl p-4">
+        <div className="space-y-1">
+          <h2 className="font-heading text-sm font-medium text-foreground">Paso 9 · Cierre</h2>
+          <p className="text-xs text-muted-foreground">
+            {order.status === "Cerrado"
+              ? "Este pedido ya está cerrado."
+              : canClose
+                ? "Ya está entregado y liquidado — listo para cerrar."
+                : "Se habilita cuando el pedido esté Entregado y sin saldo pendiente."}
+          </p>
+        </div>
+        {order.status === "Cerrado" ? (
+          <OrderStatusBadge status="Cerrado" />
+        ) : canClose ? (
+          <CloseOrderButton orderId={order.id} />
+        ) : null}
+      </section>
     </div>
   );
 }

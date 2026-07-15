@@ -248,7 +248,7 @@ export async function createOrder(input: CreateOrderInput) {
   return order
 }
 
-const ORDER_STATUSES = ['Disenando', 'DisenoAprobado', 'Maquilando', 'Completado', 'Entregado']
+const ORDER_STATUSES = ['Disenando', 'DisenoAprobado', 'Maquilando', 'Completado', 'Entregado', 'Cerrado']
 const CONSUMABLE_STATUSES = ['Completado', 'Entregado']
 
 export interface UpdateOrderStatusOptions {
@@ -427,8 +427,8 @@ export async function listOrders(opts: ListOrdersOptions = {}) {
 }
 
 /**
- * Órdenes con deliveryDate no nula, para el calendario de entregas
- * (/calendario). Trae lead para mostrar nombre en cada tarjeta del día;
+ * Órdenes con deliveryDate no nula, para la vista calendario de
+ * /pedidos?vista=calendario. Trae lead para mostrar nombre en cada tarjeta del día;
  * no filtra por rango de mes aquí (son pocas filas en este negocio) — el
  * agrupamiento por día/mes se hace en la página que arma la grilla.
  */

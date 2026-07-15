@@ -114,7 +114,6 @@ export async function createMaterial(data: CreateMaterialInput) {
   })
 
   revalidatePath('/materiales')
-  revalidatePath('/inventario')
   revalidatePath('/')
 
   return material
@@ -159,7 +158,6 @@ export async function updateMaterial(id: string, data: UpdateMaterialInput) {
   })
 
   revalidatePath('/materiales')
-  revalidatePath('/inventario')
   revalidatePath('/')
 
   return material
@@ -173,7 +171,6 @@ export async function archiveMaterial(id: string) {
   })
 
   revalidatePath('/materiales')
-  revalidatePath('/inventario')
   revalidatePath('/')
 
   return material
@@ -187,7 +184,6 @@ export async function unarchiveMaterial(id: string) {
   })
 
   revalidatePath('/materiales')
-  revalidatePath('/inventario')
   revalidatePath('/')
 
   return material
