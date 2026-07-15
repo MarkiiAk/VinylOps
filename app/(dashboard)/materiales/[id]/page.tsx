@@ -19,6 +19,7 @@ import { costPerSheet, hasFixedSheet, areaToSheets, isPieceUnit } from "@/lib/sh
 import { PurchaseForm } from "../_components/purchase-form";
 import { MaterialFormDialog } from "../_components/material-form-dialog";
 import { MaterialCostChart } from "../_components/material-cost-chart";
+import { DeletePurchaseButton } from "../_components/delete-purchase-button";
 
 function formatMXN(value: number, maximumFractionDigits = 2) {
   return new Intl.NumberFormat("es-MX", {
@@ -177,6 +178,7 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                   <TableHead className="text-right">
                     {fixedSheet ? "Costo / hoja" : pieceUnit ? "Costo / pieza" : "Costo / cm2"}
                   </TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -203,6 +205,12 @@ export default async function MaterialDetailPage({ params }: MaterialDetailPageP
                       {fixedSheet
                         ? formatMXN(costPerSheet(purchase.costPerCm2, material), 2)
                         : formatMXN(purchase.costPerCm2, pieceUnit ? 2 : 4)}
+                    </TableCell>
+                    <TableCell>
+                      <DeletePurchaseButton
+                        purchaseId={purchase.id}
+                        label={`${formatDate(purchase.purchaseDate)} · ${formatMXN(purchase.finalPrice)}`}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

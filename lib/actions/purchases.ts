@@ -136,3 +136,53 @@ export async function createPurchase(input: PurchaseInput) {
 
   return result
 }
+
+/**
+ * Elimina una compra y le regresa al material el área/valor que había
+ * aportado (mismo criterio de reversión que deleteOrderWithinTx en
+ * lib/actions/orders.ts para InventoryConsumption): resta del acumulado en
+ * vez de recalcular todo desde cero, y clampea a 0 por si ya se consumió
+ * más de lo que esta compra aportó. El costo promedio ponderado NO se
+ * resetea a 0 si el área llega a 0 — se conserva como "último costo
+ * conocido", mismo criterio que consumeMaterial.
+ */
+export async function deletePurchase(id: string) {
+  await requireSession()
+
+  const result = await prisma.$transaction(async (tx) => {
+    const purchase = await tx.purchase.findUnique({ where: { id } })
+    if (!purchase) {
+      throw new Error('No se encontró la compra a eliminar')
+    }
+
+    const material = await tx.material.findUnique({ where: { id: purchase.materialId } })
+    if (!material) {
+      throw new Error('No se encontró el material de esta compra')
+    }
+
+    const newTotalArea = Math.max(0, material.totalAreaCm2 - purchase.totalAreaCm2)
+    const newTotalValue = Math.max(0, material.totalValue - purchase.finalPrice)
+    const newWeightedAverageCostPerCm2 = newTotalArea > 0 ? newTotalValue / newTotalArea : material.weightedAverageCostPerCm2
+
+    await tx.material.update({
+      where: { id: material.id },
+      data: {
+        totalAreaCm2: newTotalArea,
+        totalValue: newTotalValue,
+        weightedAverageCostPerCm2: newWeightedAverageCostPerCm2,
+        weightedAverageCostPerM2: newWeightedAverageCostPerCm2 * 10_000,
+      },
+    })
+
+    await tx.purchase.delete({ where: { id } })
+
+    return purchase
+  })
+
+  revalidatePath('/materiales')
+  revalidatePath(`/materiales/${result.materialId}`)
+  revalidatePath('/reportes/financiero')
+  revalidatePath('/')
+
+  return result
+}
