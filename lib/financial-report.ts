@@ -196,8 +196,11 @@ export function computeFinancialReport(input: FinancialReportInput): FinancialRe
         acc.luz += (line.unitElectricityCost ?? 0) * line.quantity
         acc.desgaste += (line.unitWearCost ?? 0) * line.quantity
         acc.merma += (line.unitWasteCost ?? 0) * line.quantity
-        acc.bolsa += (line.unitBagCost ?? 0) * line.quantity
-        acc.etiquetita += (line.unitLabelCost ?? 0) * line.quantity
+        // Bolsa/etiquetita NO escalan por cantidad — son 1 sola bolsa y 1
+        // etiquetita por pedido, ya congeladas así por createOrder (ver
+        // lib/actions/orders.ts), no por unidad vendida.
+        acc.bolsa += line.unitBagCost ?? 0
+        acc.etiquetita += line.unitLabelCost ?? 0
         acc.manoDeObra += (line.estimatedUnitLabor ?? 0) * line.quantity
       }
       return acc

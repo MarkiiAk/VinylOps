@@ -97,17 +97,22 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const otrosPagos = order.payments.filter((p) => p.type !== "Anticipo" && p.type !== "Liquidacion");
 
   // Paso 8 (corte de ganancia): el desglose por componente ya viene congelado
-  // por línea (unit*Cost en OrderLineItem, ver lib/costing.ts) — aquí solo se
-  // suma cantidad * costo unitario de cada componente a nivel pedido.
+  // por línea (unit*Cost en OrderLineItem, ver lib/costing.ts). Material/
+  // tinta/luz/desgaste/merma escalan por cantidad; bolsa/etiquetita NO —
+  // createOrder ya congela un solo total de bolsa/etiquetita para todo el
+  // pedido (en la primera línea), así que aquí se suman tal cual, sin
+  // volver a multiplicar por cantidad.
   const sumComponent = (pick: (line: OrderLineItem) => number | null) =>
     order.lineItems.reduce((sum, line) => sum + (pick(line) ?? 0) * line.quantity, 0);
+  const sumFlatComponent = (pick: (line: OrderLineItem) => number | null) =>
+    order.lineItems.reduce((sum, line) => sum + (pick(line) ?? 0), 0);
 
   const costoMaterial = sumComponent((l) => l.unitMaterialCost);
   const costoTinta = sumComponent((l) => l.unitInkCost);
   const costoLuz = sumComponent((l) => l.unitElectricityCost);
   const costoDesgaste = sumComponent((l) => l.unitWearCost);
   const costoMerma = sumComponent((l) => l.unitWasteCost);
-  const costoBolsaEtiqueta = sumComponent((l) => l.unitBagCost) + sumComponent((l) => l.unitLabelCost);
+  const costoBolsaEtiqueta = sumFlatComponent((l) => l.unitBagCost) + sumFlatComponent((l) => l.unitLabelCost);
 
   const totalDirectCost = order.lineItems.reduce((sum, line) => sum + (line.totalDirectCost ?? 0), 0);
   const totalLabor = order.lineItems.reduce((sum, line) => sum + (line.totalLabor ?? 0), 0);

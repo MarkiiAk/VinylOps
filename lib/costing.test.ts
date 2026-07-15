@@ -37,16 +37,20 @@ describe('computeLineSnapshot — ganancia bruta y margen', () => {
       lineTotal: 100, // 2 unidades a $50
     })
 
-    // costo directo unitario = 5+1+0.5+0.2+0.3+1+0.5 = 8.5; total = 17
+    // costo directo unitario (referencia, si se vendiera 1 sola unidad) =
+    // 5+1+0.5+0.2+0.3+1+0.5 = 8.5
     expect(snapshot.unitDirectCost).toBeCloseTo(8.5, 6)
-    expect(snapshot.totalDirectCost).toBeCloseTo(17, 6)
-    expect(snapshot.lineGrossProfit).toBeCloseTo(83, 6) // 100 - 17
-    expect(snapshot.lineGrossMargin).toBeCloseTo(0.83, 6)
+    // costo directo total: material/tinta/luz/desgaste/merma SÍ escalan por
+    // cantidad ((5+1+0.5+0.2+0.3)*2=14), bolsa/etiquetita NO (son 1 sola
+    // bolsa y 1 etiquetita para toda la línea, no una por unidad) -> 14+1+0.5=15.5
+    expect(snapshot.totalDirectCost).toBeCloseTo(15.5, 6)
+    expect(snapshot.lineGrossProfit).toBeCloseTo(84.5, 6) // 100 - 15.5
+    expect(snapshot.lineGrossMargin).toBeCloseTo(0.845, 6)
 
-    // mano de obra total = 3*2 = 6; ganancia c/mano = 83-6=77; margen = 0.77
+    // mano de obra total = 3*2 = 6; ganancia c/mano = 84.5-6=78.5; margen = 0.785
     expect(snapshot.totalLabor).toBeCloseTo(6, 6)
-    expect(snapshot.profitAfterLabor).toBeCloseTo(77, 6)
-    expect(snapshot.marginAfterLabor).toBeCloseTo(0.77, 6)
+    expect(snapshot.profitAfterLabor).toBeCloseTo(78.5, 6)
+    expect(snapshot.marginAfterLabor).toBeCloseTo(0.785, 6)
   })
 
   it('protege contra división entre cero cuando lineTotal es 0', () => {

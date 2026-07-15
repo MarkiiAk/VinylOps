@@ -80,7 +80,20 @@ export interface LineSnapshot extends UnitCostBreakdown {
 /** Snapshot financiero completo de una linea, listo para congelar en OrderLineItem. */
 export function computeLineSnapshot(input: LineSnapshotInput): LineSnapshot {
   const unitDirectCost = computeUnitDirectCost(input)
-  const totalDirectCost = roundForStorage(unitDirectCost * input.quantity)
+  // Bolsa y etiquetita son un costo de EMPAQUE de la línea, no un costo POR
+  // UNIDAD: si vendes 3 de lo mismo en una línea, siguen siendo 1 bolsa y 1
+  // etiquetita, no 3 — a diferencia de material/tinta/luz/desgaste/merma,
+  // que sí escalan con la cantidad (feedback real del dueño: "para un
+  // carrito se usa UNA bolsita y UNA etiquetita no 3 bolsas"). unitDirectCost
+  // (arriba) no cambia — sigue siendo el costo de referencia si se vendiera
+  // 1 sola unidad (lo usa el costeo de catálogo, ver lib/actions/catalog.ts).
+  const scalingUnitCost =
+    input.unitMaterialCost +
+    input.unitInkCost +
+    input.unitElectricityCost +
+    input.unitWearCost +
+    input.unitWasteCost
+  const totalDirectCost = roundForStorage(scalingUnitCost * input.quantity + input.unitBagCost + input.unitLabelCost)
   const totalLabor = roundForStorage(input.estimatedUnitLabor * input.quantity)
 
   const lineGrossProfit = roundForStorage(input.lineTotal - totalDirectCost)

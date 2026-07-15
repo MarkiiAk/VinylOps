@@ -171,10 +171,10 @@ export async function createOrder(input: CreateOrderInput) {
     }
   }
 
-  // FASE 2 (V1): cada línea congela AQUÍ, al crear el pedido, su snapshot
-  // financiero completo (ver lib/costing.ts) — nunca se vuelve a recalcular
-  // después, aunque cambie el catálogo, el costo de un material o el precio.
-  const resolvedLines = input.lineItems.map((line) => {
+  // Resuelve los costos unitarios de cada línea (aún sin congelar el
+  // snapshot) — se necesita ver TODAS las líneas antes de decidir cuánto
+  // cobrar de bolsa/etiquetita (ver dedupBagAndLabelCosts abajo).
+  const resolvedLineCosts = input.lineItems.map((line) => {
     const catalogItem = line.catalogItemId ? catalogItemMap.get(line.catalogItemId) : undefined
     if (line.catalogItemId && !catalogItem) {
       throw new Error('Una de las líneas hace referencia a un item de catálogo que no existe')
@@ -233,8 +233,6 @@ export async function createOrder(input: CreateOrderInput) {
       }
     }
 
-    const snapshot = computeLineSnapshot({ ...unitCosts, quantity: line.quantity, lineTotal })
-
     return {
       catalogItemId: line.catalogItemId,
       description,
@@ -243,6 +241,35 @@ export async function createOrder(input: CreateOrderInput) {
       lineTotal,
       otherMaterialId: line.catalogItemId ? undefined : line.otherMaterialId,
       otherMaterialAreaCm2: line.catalogItemId ? undefined : line.otherMaterialAreaCm2,
+      unitCosts,
+    }
+  })
+
+  // Un pedido se entrega en UNA sola bolsa con UNA etiquetita, sin importar
+  // cuántas líneas o unidades distintas traiga (feedback real: "para un
+  // carrito se usa UNA bolsita y UNA etiquetita no 3 bolsas"). Se toma el
+  // costo más alto declarado entre todas las líneas (nunca se subestima el
+  // empaque real) y se le asigna completo a la primera línea; el resto queda
+  // en $0 para no duplicarlo en las sumas de "Corte de ganancia".
+  const orderBagCost = Math.max(0, ...resolvedLineCosts.map((l) => l.unitCosts.unitBagCost))
+  const orderLabelCost = Math.max(0, ...resolvedLineCosts.map((l) => l.unitCosts.unitLabelCost))
+
+  const resolvedLines = resolvedLineCosts.map((line, index) => {
+    const unitCosts = {
+      ...line.unitCosts,
+      unitBagCost: index === 0 ? orderBagCost : 0,
+      unitLabelCost: index === 0 ? orderLabelCost : 0,
+    }
+    const snapshot = computeLineSnapshot({ ...unitCosts, quantity: line.quantity, lineTotal: line.lineTotal })
+
+    return {
+      catalogItemId: line.catalogItemId,
+      description: line.description,
+      quantity: line.quantity,
+      unitPrice: line.unitPrice,
+      lineTotal: line.lineTotal,
+      otherMaterialId: line.otherMaterialId,
+      otherMaterialAreaCm2: line.otherMaterialAreaCm2,
       snapshot,
     }
   })
