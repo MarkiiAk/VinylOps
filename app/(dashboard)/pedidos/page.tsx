@@ -1,4 +1,6 @@
-import { CalendarDays } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SectionHeading } from "@/components/section-heading";
 import { EmptyState } from "@/components/empty-state";
 import { listOrders, listOrdersWithDeliveryDate } from "@/lib/actions/orders";
@@ -6,6 +8,17 @@ import { OrdersBoardClient, type OrderCardData } from "./_components/orders-boar
 import { PedidosViewToggle } from "./_components/pedidos-view-toggle";
 import { MonthNav } from "./_components/month-nav";
 import { DeliveryCalendarGrid, type DeliveryOrderData } from "./_components/delivery-calendar-grid";
+
+function NewOrderButton() {
+  return (
+    <Link href="/pedidos/nuevo">
+      <Button size="sm" className="gap-1.5 bg-neon-pink text-background hover:bg-neon-pink/90">
+        <Plus className="size-4" />
+        Nuevo pedido
+      </Button>
+    </Link>
+  );
+}
 
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
 
@@ -54,6 +67,7 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
             <div className="flex flex-wrap items-center gap-2">
               <PedidosViewToggle vista="calendario" />
               <MonthNav year={year} month={month} label={label} />
+              <NewOrderButton />
             </div>
           }
         />
@@ -87,7 +101,12 @@ export default async function PedidosPage({ searchParams }: PedidosPageProps) {
       <SectionHeading
         title="Pedidos"
         subtitle="Tablero de producción: cada tarjeta es un pedido ligado a un lead, avanza por sus fases hasta la entrega."
-        action={<PedidosViewToggle vista="kanban" />}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <PedidosViewToggle vista="kanban" />
+            <NewOrderButton />
+          </div>
+        }
       />
 
       <OrdersBoardClient orders={cards} />

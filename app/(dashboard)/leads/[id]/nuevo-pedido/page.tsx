@@ -5,7 +5,7 @@ import { listMaterials } from "@/lib/actions/materials";
 import { listCatalogItems } from "@/lib/actions/catalog";
 import { getLeadWithOrders } from "@/lib/actions/leads";
 import { SectionHeading } from "@/components/section-heading";
-import { OrderCartClient } from "./_components/order-cart-client";
+import { OrderCartClient } from "../../../pedidos/_components/order-cart/order-cart-client";
 
 interface NuevoPedidoPageProps {
   params: Promise<{ id: string }>;
@@ -44,6 +44,7 @@ export default async function NuevoPedidoPage({ params }: NuevoPedidoPageProps) 
       name: m.name,
       sheetWidthCm: m.sheetWidthCm,
       sheetHeightCm: m.sheetHeightCm,
+      unit: m.unit,
     }));
 
   return (

@@ -13,6 +13,7 @@ export interface MaterialLite {
   name: string;
   sheetWidthCm: number | null;
   sheetHeightCm: number | null;
+  unit: string;
 }
 
 export interface CartLine {

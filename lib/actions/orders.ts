@@ -26,6 +26,7 @@ import type { Prisma } from '@/lib/generated/prisma/client'
 import { requireSession } from '@/lib/auth'
 import { computeLineSnapshot, deriveKitCosts } from '@/lib/costing'
 import { decideOrderDateUpdate, toDateKey } from '@/lib/business-days'
+import { formatMaterialQuantity } from '@/lib/sheet-units'
 
 export interface OrderLineItemInput {
   catalogItemId?: string
@@ -116,7 +117,7 @@ export async function createOrder(input: CreateOrderInput) {
   const catalogItems = catalogItemIds.length
     ? await prisma.catalogItem.findMany({
         where: { id: { in: catalogItemIds } },
-        include: { kitComponents: { include: { componentItem: true } } },
+        include: { kitComponents: { include: { componentItem: true } }, materials: true },
       })
     : []
   const catalogItemMap = new Map(catalogItems.map((item) => [item.id, item]))
@@ -129,6 +130,46 @@ export async function createOrder(input: CreateOrderInput) {
     ? await prisma.material.findMany({ where: { id: { in: otherMaterialIds } } })
     : []
   const otherMaterialMap = new Map(otherMaterials.map((m) => [m.id, m]))
+
+  // No debe dejar crear un pedido si algun material con inventario real no
+  // alcanza para lo que se esta pidiendo — se avisa AHORA, no hasta que se
+  // intente descontar en silencio al llegar a Completado/Entregado (ver
+  // consumeMaterial mas abajo, que solo clampea sin bloquear nada).
+  const requiredAreaByMaterialId = new Map<string, number>()
+  for (const line of input.lineItems) {
+    const catalogItem = line.catalogItemId ? catalogItemMap.get(line.catalogItemId) : undefined
+    if (catalogItem) {
+      for (const recipeLine of catalogItem.materials) {
+        const current = requiredAreaByMaterialId.get(recipeLine.materialId) ?? 0
+        requiredAreaByMaterialId.set(recipeLine.materialId, current + recipeLine.areaCm2PerUnit * line.quantity)
+      }
+    } else if (line.otherMaterialId && line.otherMaterialAreaCm2) {
+      const current = requiredAreaByMaterialId.get(line.otherMaterialId) ?? 0
+      requiredAreaByMaterialId.set(line.otherMaterialId, current + line.otherMaterialAreaCm2)
+    }
+  }
+
+  if (requiredAreaByMaterialId.size > 0) {
+    const recipeMaterialIds = [...requiredAreaByMaterialId.keys()].filter((id) => !otherMaterialMap.has(id))
+    const recipeMaterials = recipeMaterialIds.length
+      ? await prisma.material.findMany({ where: { id: { in: recipeMaterialIds } } })
+      : []
+    const materialById = new Map([...otherMaterials, ...recipeMaterials].map((m) => [m.id, m]))
+
+    const shortages: string[] = []
+    for (const [materialId, requiredArea] of requiredAreaByMaterialId) {
+      const material = materialById.get(materialId)
+      if (!material || !material.isInventoryTracked) continue
+      if (requiredArea > material.totalAreaCm2) {
+        shortages.push(
+          `${material.name}: necesitas ${formatMaterialQuantity(requiredArea, material)} y solo hay ${formatMaterialQuantity(material.totalAreaCm2, material)} disponibles`
+        )
+      }
+    }
+    if (shortages.length > 0) {
+      throw new Error(`No tienes material suficiente para este pedido — ${shortages.join('; ')}.`)
+    }
+  }
 
   // FASE 2 (V1): cada línea congela AQUÍ, al crear el pedido, su snapshot
   // financiero completo (ver lib/costing.ts) — nunca se vuelve a recalcular

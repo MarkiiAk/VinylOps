@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { createOrder } from "@/lib/actions/orders";
 import { AddCatalogItemDialog } from "./add-catalog-item-dialog";
@@ -18,28 +25,45 @@ function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
 }
 
+export interface LeadOption {
+  id: string;
+  name: string | null;
+  phone: string | null;
+}
+
 interface OrderCartClientProps {
-  leadId: string;
+  /** Si se pasa, el lead viene fijo (ruta /leads/[id]/nuevo-pedido) y no se muestra selector. */
+  leadId?: string;
+  /** Requerido cuando NO se pasa leadId (ruta /pedidos/nuevo) — lista de leads reales para elegir uno, tipado fuerte: no se puede crear un pedido sin ligarlo a un lead existente. */
+  leads?: LeadOption[];
   catalogItems: CatalogItemLite[];
   materials: MaterialLite[];
 }
 
 /**
- * Orquestador del carrito de "Nuevo pedido", ligado a un lead ya fijo (viene
- * de la ruta /leads/[id]/nuevo-pedido, sin selector de lead como tenía el
- * viejo QuoteCartClient). Estado 100% local hasta guardar: se arma la lista
+ * Orquestador del carrito de "Nuevo pedido". Puede venir con el lead ya fijo
+ * (desde /leads/[id]/nuevo-pedido) o con un selector de lead existente
+ * (desde /pedidos/nuevo) — nunca permite crear un pedido sin un lead real
+ * detrás, ver handleSave. Estado 100% local hasta guardar: se arma la lista
  * de líneas (catálogo y/o "Otro"), se describe qué se está vendiendo/
  * trabajando (interest) y al guardar se manda todo de una sola vez a
  * createOrder.
  */
-export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartClientProps) {
+export function OrderCartClient({ leadId: fixedLeadId, leads, catalogItems, materials }: OrderCartClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
+  const [selectedLeadId, setSelectedLeadId] = useState<string | undefined>(undefined);
   const [interest, setInterest] = useState("");
   const [notes, setNotes] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
   const [lines, setLines] = useState<CartLine[]>([]);
+
+  const leadId = fixedLeadId ?? selectedLeadId;
+  const leadOptions = leads?.map((lead) => ({
+    value: lead.id,
+    label: [lead.name || "Sin nombre", lead.phone].filter(Boolean).join(" · "),
+  }));
 
   const total = useMemo(() => lines.reduce((sum, line) => sum + lineTotal(line), 0), [lines]);
 
@@ -52,6 +76,10 @@ export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartCl
   }
 
   function handleSave() {
+    if (!leadId) {
+      toast.error("Selecciona a qué lead pertenece este pedido");
+      return;
+    }
     if (!interest.trim()) {
       toast.error("Describe qué se está vendiendo/trabajando en este pedido");
       return;
@@ -86,7 +114,7 @@ export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartCl
         });
 
         toast.success("Pedido creado");
-        router.push(`/leads/${leadId}?order=${order.id}`);
+        router.push(fixedLeadId ? `/leads/${fixedLeadId}?order=${order.id}` : `/pedidos/${order.id}`);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "No se pudo guardar el pedido");
       }
@@ -98,6 +126,28 @@ export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartCl
       <div className="space-y-6">
         <section className="glass-panel space-y-4 rounded-2xl p-5">
           <h2 className="font-heading text-sm font-semibold tracking-tight text-foreground">Este pedido</h2>
+
+          {!fixedLeadId ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="order-lead">Lead</Label>
+              <Select value={selectedLeadId ?? null} items={leadOptions} onValueChange={(value) => setSelectedLeadId(value ?? undefined)}>
+                <SelectTrigger id="order-lead" className="w-full">
+                  <SelectValue placeholder="Selecciona un lead existente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leads?.map((lead) => (
+                    <SelectItem key={lead.id} value={lead.id}>
+                      {[lead.name || "Sin nombre", lead.phone].filter(Boolean).join(" · ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Todo pedido debe estar ligado a un lead ya existente — si es un cliente nuevo, créalo primero desde
+                Leads.
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-1.5">
             <Label htmlFor="order-interest">¿Qué se está vendiendo/trabajando?</Label>
@@ -193,7 +243,7 @@ export function OrderCartClient({ leadId, catalogItems, materials }: OrderCartCl
             <Button
               type="button"
               className="flex-1 gap-1.5 bg-neon-pink text-background hover:bg-neon-pink/90"
-              disabled={isPending}
+              disabled={isPending || !leadId}
               onClick={handleSave}
             >
               <Save className="size-4" />
