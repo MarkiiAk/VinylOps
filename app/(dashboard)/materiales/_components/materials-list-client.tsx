@@ -8,8 +8,9 @@ import { AlertTriangle, Archive, ArchiveRestore, ExternalLink, Layers, RefreshCw
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { archiveMaterial, unarchiveMaterial } from "@/lib/actions/materials";
-import { costPerSheet, hasFixedSheet } from "@/lib/sheet-units";
+import { costPerSheet, hasFixedSheet, isPieceUnit } from "@/lib/sheet-units";
 import { MaterialFilterBar } from "./material-filter-bar";
 import { MaterialFormDialog } from "./material-form-dialog";
 import { PurchaseForm } from "./purchase-form";
@@ -50,6 +51,12 @@ function formatSheets(count: number) {
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} hoja${rounded === 1 ? "" : "s"}`;
 }
 
+/** Piezas disponibles — para materiales por unidad, totalAreaCm2 es directamente el conteo (ver purchase-form.tsx). */
+function formatPieces(count: number) {
+  const rounded = Math.round(count * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} pieza${rounded === 1 ? "" : "s"}`;
+}
+
 /**
  * Catalogo + inventario de materiales en una sola pantalla (antes eran dos
  * rutas separadas sobre la misma tabla, distinguidas solo por
@@ -65,12 +72,9 @@ export function MaterialsListClient({ materials }: MaterialsListClientProps) {
   const router = useRouter();
   const filters = useMaterialFilters(materials);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Material | null>(null);
 
-  async function handleArchiveToggle(material: Material) {
-    if (!material.isArchived) {
-      const confirmed = window.confirm(`Archivar "${material.name}"? Podras verlo de nuevo activando el filtro de archivados.`);
-      if (!confirmed) return;
-    }
+  async function performArchiveToggle(material: Material) {
     setArchivingId(material.id);
     try {
       if (material.isArchived) {
@@ -80,6 +84,7 @@ export function MaterialsListClient({ materials }: MaterialsListClientProps) {
         await archiveMaterial(material.id);
         toast.success("Material archivado", { description: material.name });
       }
+      setArchiveTarget(null);
       router.refresh();
     } catch (error) {
       toast.error("No se pudo actualizar el material", {
@@ -88,6 +93,14 @@ export function MaterialsListClient({ materials }: MaterialsListClientProps) {
     } finally {
       setArchivingId(null);
     }
+  }
+
+  function handleArchiveToggle(material: Material) {
+    if (!material.isArchived) {
+      setArchiveTarget(material);
+      return;
+    }
+    performArchiveToggle(material);
   }
 
   return (
@@ -134,6 +147,22 @@ export function MaterialsListClient({ materials }: MaterialsListClientProps) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+        title="Archivar material"
+        description={
+          archiveTarget
+            ? `¿Archivar "${archiveTarget.name}"? Podrás verlo de nuevo activando el filtro de archivados.`
+            : ""
+        }
+        confirmLabel="Archivar"
+        loading={archivingId === archiveTarget?.id}
+        onConfirm={() => archiveTarget && performArchiveToggle(archiveTarget)}
+      />
     </div>
   );
 }
@@ -184,12 +213,14 @@ function CatalogMaterialCard({
         {material.isInventoryTracked ? (
           <>
             <span className="text-muted-foreground">
-              {hasFixedSheet(material) ? "Hojas disponibles" : "Area disponible"}
+              {hasFixedSheet(material) ? "Hojas disponibles" : isPieceUnit(material) ? "Piezas disponibles" : "Area disponible"}
             </span>
             <span className="text-right tabular-nums text-foreground">
               {hasFixedSheet(material)
                 ? formatSheets(sheetsAvailable(material as Material & { sheetWidthCm: number; sheetHeightCm: number }))
-                : formatM2(material.totalAreaCm2)}
+                : isPieceUnit(material)
+                  ? formatPieces(material.totalAreaCm2)
+                  : formatM2(material.totalAreaCm2)}
             </span>
             <span className="text-muted-foreground">Valor inventario</span>
             <span className="text-right tabular-nums font-medium text-foreground">
@@ -202,6 +233,13 @@ function CatalogMaterialCard({
             <span className="text-muted-foreground">Costo / hoja</span>
             <span className="text-right tabular-nums text-foreground">
               {formatMXN(costPerSheet(material.weightedAverageCostPerCm2, material), 2)}
+            </span>
+          </>
+        ) : isPieceUnit(material) ? (
+          <>
+            <span className="text-muted-foreground">Costo / pieza</span>
+            <span className="text-right tabular-nums text-foreground">
+              {formatMXN(material.weightedAverageCostPerCm2, 2)}
             </span>
           </>
         ) : (
@@ -252,6 +290,7 @@ function CatalogMaterialCard({
             purchaseUrl: material.purchaseUrl,
             sheetWidthCm: material.sheetWidthCm,
             sheetHeightCm: material.sheetHeightCm,
+            unit: material.unit,
           }}
           trigger={
             <Button size="sm" variant="ghost">

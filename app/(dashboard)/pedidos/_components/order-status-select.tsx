@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ORDER_STATUS_OPTIONS, SELECTABLE_ORDER_STATUS_OPTIONS } from "@/components/order-status-badge";
 import { updateOrderStatus } from "@/lib/actions/orders";
 
@@ -29,6 +30,11 @@ interface OrderStatusSelectProps {
  */
 export function OrderStatusSelect({ orderId, status, size = "sm", className }: OrderStatusSelectProps) {
   const [isPending, startTransition] = useTransition();
+  // FASE 3 (V1, regla de días hábiles): ya había una fecha compromiso (manual
+  // o de una aprobación anterior) — nunca se sobrescribe sola, se pregunta
+  // antes de recalcularla. Guarda el status ya aplicado para el que hace
+  // falta esta segunda confirmación.
+  const [pendingRecalcStatus, setPendingRecalcStatus] = useState<string | null>(null);
   const router = useRouter();
 
   function handleChange(nextStatus: string | null) {
@@ -38,20 +44,8 @@ export function OrderStatusSelect({ orderId, status, size = "sm", className }: O
         const result = await updateOrderStatus(orderId, nextStatus, { consumeInventory: true });
         toast.success(`Status actualizado a ${nextStatus}`);
 
-        // FASE 3 (V1, regla de días hábiles): ya había una fecha compromiso
-        // (manual o de una aprobación anterior) — nunca se sobrescribe sola,
-        // se pregunta antes de recalcularla.
         if (result.needsDeliveryDateConfirmation) {
-          const confirmed = window.confirm(
-            "Este pedido ya tenía una fecha de entrega comprometida. ¿Quieres recalcularla como 3 días hábiles a partir de hoy?"
-          );
-          if (confirmed) {
-            await updateOrderStatus(orderId, nextStatus, {
-              consumeInventory: true,
-              confirmRecalculateDeliveryDate: true,
-            });
-            toast.success("Fecha de entrega recalculada");
-          }
+          setPendingRecalcStatus(nextStatus);
         }
 
         router.refresh();
@@ -63,18 +57,50 @@ export function OrderStatusSelect({ orderId, status, size = "sm", className }: O
     });
   }
 
+  function handleConfirmRecalculate() {
+    if (!pendingRecalcStatus) return;
+    startTransition(async () => {
+      try {
+        await updateOrderStatus(orderId, pendingRecalcStatus, {
+          consumeInventory: true,
+          confirmRecalculateDeliveryDate: true,
+        });
+        toast.success("Fecha de entrega recalculada");
+        setPendingRecalcStatus(null);
+        router.refresh();
+      } catch (error) {
+        toast.error("No se pudo recalcular la fecha de entrega", {
+          description: error instanceof Error ? error.message : undefined,
+        });
+      }
+    });
+  }
+
   return (
-    <Select value={status} items={ORDER_STATUS_OPTIONS} onValueChange={handleChange} disabled={isPending}>
-      <SelectTrigger size={size} className={className ?? "w-40"}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {SELECTABLE_ORDER_STATUS_OPTIONS.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <>
+      <Select value={status} items={ORDER_STATUS_OPTIONS} onValueChange={handleChange} disabled={isPending}>
+        <SelectTrigger size={size} className={className ?? "w-40"}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SELECTABLE_ORDER_STATUS_OPTIONS.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <ConfirmDialog
+        open={pendingRecalcStatus !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRecalcStatus(null);
+        }}
+        title="Recalcular fecha de entrega"
+        description="Este pedido ya tenía una fecha de entrega comprometida. ¿Quieres recalcularla como 3 días hábiles a partir de hoy?"
+        confirmLabel="Recalcular"
+        loading={isPending}
+        onConfirm={handleConfirmRecalculate}
+      />
+    </>
   );
 }

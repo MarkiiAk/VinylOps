@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Receipt, Trash2 } from "lucide-react";
+import { Loader2, Receipt, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { deleteExpense } from "@/lib/actions/expenses";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { isDateInRange, type DateRangePreset } from "@/lib/date-ranges";
@@ -59,6 +60,7 @@ export function ExpensesListClient({ expenses }: { expenses: ExpenseRow[] }) {
   const [range, setRange] = useState<DateRangePreset>("mes");
   const [category, setCategory] = useState<string>(ALL_CATEGORIES);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [expenseToDelete, setExpenseToDelete] = useState<ExpenseRow | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -71,12 +73,11 @@ export function ExpensesListClient({ expenses }: { expenses: ExpenseRow[] }) {
   const total = useMemo(() => filtered.reduce((sum, e) => sum + e.amount, 0), [filtered]);
 
   async function handleDelete(expense: ExpenseRow) {
-    const confirmed = window.confirm(`¿Eliminar el gasto "${expense.concept}" (${formatMXN(expense.amount)})?`);
-    if (!confirmed) return;
     setDeletingId(expense.id);
     try {
       await deleteExpense(expense.id);
       toast.success("Gasto eliminado");
+      setExpenseToDelete(null);
       router.refresh();
     } catch (error) {
       toast.error("No se pudo eliminar el gasto", {
@@ -168,15 +169,36 @@ export function ExpensesListClient({ expenses }: { expenses: ExpenseRow[] }) {
                 size="icon-sm"
                 variant="ghost"
                 disabled={deletingId === expense.id}
-                onClick={() => handleDelete(expense)}
+                onClick={() => setExpenseToDelete(expense)}
                 title="Eliminar"
               >
-                <Trash2 className="size-3.5 text-destructive" />
+                {deletingId === expense.id ? (
+                  <Loader2 className="size-3.5 animate-spin text-destructive" />
+                ) : (
+                  <Trash2 className="size-3.5 text-destructive" />
+                )}
               </Button>
             </div>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={expenseToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setExpenseToDelete(null);
+        }}
+        title="Eliminar gasto"
+        description={
+          expenseToDelete
+            ? `¿Eliminar el gasto "${expenseToDelete.concept}" (${formatMXN(expenseToDelete.amount)})?`
+            : ""
+        }
+        confirmLabel="Eliminar"
+        variant="destructive"
+        loading={deletingId === expenseToDelete?.id}
+        onConfirm={() => expenseToDelete && handleDelete(expenseToDelete)}
+      />
     </div>
   );
 }

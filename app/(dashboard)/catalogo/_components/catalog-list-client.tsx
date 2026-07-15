@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { archiveCatalogItem, unarchiveCatalogItem } from "@/lib/actions/catalog";
 import { CatalogItemFormDialog, type CatalogMaterialOption } from "./catalog-item-form-dialog";
 
@@ -111,19 +112,14 @@ export function CatalogListClient({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<CatalogItemRow | null>(null);
 
   const filtered = useMemo(
     () => items.filter((item) => (showArchived ? !item.isActive : item.isActive)),
     [items, showArchived]
   );
 
-  async function handleArchiveToggle(item: CatalogItemRow) {
-    if (item.isActive) {
-      const confirmed = window.confirm(
-        `Archivar "${item.name}"? Dejará de aparecer en el catálogo activo, pero podrás verlo con "Ver archivados".`
-      );
-      if (!confirmed) return;
-    }
+  async function performArchiveToggle(item: CatalogItemRow) {
     setArchivingId(item.id);
     try {
       if (item.isActive) {
@@ -133,6 +129,7 @@ export function CatalogListClient({
         await unarchiveCatalogItem(item.id);
         toast.success("Producto reactivado", { description: item.name });
       }
+      setArchiveTarget(null);
       router.refresh();
     } catch (error) {
       toast.error("No se pudo actualizar el producto", {
@@ -141,6 +138,14 @@ export function CatalogListClient({
     } finally {
       setArchivingId(null);
     }
+  }
+
+  function handleArchiveToggle(item: CatalogItemRow) {
+    if (item.isActive) {
+      setArchiveTarget(item);
+      return;
+    }
+    performArchiveToggle(item);
   }
 
   return (
@@ -332,6 +337,22 @@ export function CatalogListClient({
           </Table>
         </div>
       )}
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+        title="Archivar producto"
+        description={
+          archiveTarget
+            ? `¿Archivar "${archiveTarget.name}"? Dejará de aparecer en el catálogo activo, pero podrás verlo con "Ver archivados".`
+            : ""
+        }
+        confirmLabel="Archivar"
+        loading={archivingId === archiveTarget?.id}
+        onConfirm={() => archiveTarget && performArchiveToggle(archiveTarget)}
+      />
     </div>
   );
 }

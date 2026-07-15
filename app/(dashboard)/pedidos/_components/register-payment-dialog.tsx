@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { createPayment } from "@/lib/actions/payments";
 import { OVERPAYMENT_MARKER } from "@/lib/payment-rules";
 
@@ -58,6 +59,7 @@ export function RegisterPaymentDialog({ orderId }: RegisterPaymentDialogProps) {
   const [method, setMethod] = useState<PaymentMethod>("Efectivo");
   const [paidAt, setPaidAt] = useState(todayInputValue());
   const [notes, setNotes] = useState("");
+  const [overpaymentDetail, setOverpaymentDetail] = useState<string | null>(null);
 
   function reset() {
     setAmount("");
@@ -87,25 +89,31 @@ export function RegisterPaymentDialog({ orderId }: RegisterPaymentDialogProps) {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      try {
-        await submit(false);
-      } catch (error) {
-        if (error instanceof Error && error.message.startsWith(OVERPAYMENT_MARKER)) {
-          const detail = error.message.split(':').slice(1).join(':').trim();
-          const confirmed = window.confirm(
-            `${detail || "Este pago deja un sobrepago sobre el total del pedido."} ¿Registrarlo de todas formas?`
-          );
-          if (!confirmed) {
-            setSubmitting(false);
-            return;
-          }
-          await submit(true);
-        } else {
-          throw error;
-        }
-      }
-
+      await submit(false);
       toast.success("Pago registrado");
+      setOpen(false);
+      reset();
+      router.refresh();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith(OVERPAYMENT_MARKER)) {
+        const detail = error.message.split(':').slice(1).join(':').trim();
+        setOverpaymentDetail(detail || "Este pago deja un sobrepago sobre el total del pedido.");
+        setSubmitting(false);
+        return;
+      }
+      toast.error("No se pudo registrar el pago", {
+        description: error instanceof Error ? error.message : "Error desconocido",
+      });
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmOverpayment() {
+    setSubmitting(true);
+    try {
+      await submit(true);
+      toast.success("Pago registrado");
+      setOverpaymentDetail(null);
       setOpen(false);
       reset();
       router.refresh();
@@ -225,6 +233,17 @@ export function RegisterPaymentDialog({ orderId }: RegisterPaymentDialogProps) {
           </DialogFooter>
         </form>
       </DialogContent>
+      <ConfirmDialog
+        open={overpaymentDetail !== null}
+        onOpenChange={(next) => {
+          if (!next) setOverpaymentDetail(null);
+        }}
+        title="Sobrepago"
+        description={`${overpaymentDetail} ¿Registrarlo de todas formas?`}
+        confirmLabel="Registrar de todas formas"
+        loading={submitting}
+        onConfirm={handleConfirmOverpayment}
+      />
     </Dialog>
   );
 }

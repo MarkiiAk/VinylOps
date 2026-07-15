@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Trash2, MessageCircleMore, ChevronRight } from "lucide-react";
+import { Loader2, Trash2, MessageCircleMore, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { LeadStatusBadge, LEAD_STATUS_OPTIONS } from "@/components/lead-status-badge";
 import { updateLead, deleteLead, countLeadOrders } from "@/lib/actions/leads";
 import { LeadFormDialog } from "./lead-form-dialog";
@@ -37,12 +38,14 @@ function formatDate(iso: string) {
 /**
  * Board de leads: tarjetas con nombre/teléfono/notas, Select inline para
  * cambiar status (llama updateLead al vuelo), editar (reusa LeadFormDialog
- * en modo edición), eliminar (confirm simple, no es data financiera) y un
- * link a /leads/[id] para ver el historial de pedidos de ese contacto.
- * Server component (page.tsx) ya trae la lista ordenada.
+ * en modo edición), eliminar (vía ConfirmDialog, con conteo de pedidos que se
+ * van con él) y un link a /leads/[id] para ver el historial de pedidos de
+ * ese contacto. Server component (page.tsx) ya trae la lista ordenada.
  */
 export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
   const [isPending, startTransition] = useTransition();
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ lead: LeadRow; orderCount: number } | null>(null);
   const router = useRouter();
 
   function handleStatusChange(lead: LeadRow, nextStatus: string | null) {
@@ -60,19 +63,28 @@ export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
     });
   }
 
-  function handleDelete(lead: LeadRow) {
-    const label = lead.name || "este lead";
+  async function handleDeleteClick(lead: LeadRow) {
+    setCheckingId(lead.id);
+    try {
+      const orderCount = await countLeadOrders(lead.id);
+      setDeleteTarget({ lead, orderCount });
+    } catch (error) {
+      toast.error("No se pudo verificar el lead", {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setCheckingId(null);
+    }
+  }
+
+  function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    const { lead } = deleteTarget;
     startTransition(async () => {
       try {
-        const orderCount = await countLeadOrders(lead.id);
-        const warning =
-          orderCount > 0
-            ? `¿Eliminar ${label}? Esto también borra ${orderCount} pedido(s) suyo(s) con sus pagos — no se puede deshacer.`
-            : `¿Eliminar ${label}? Esta acción no se puede deshacer.`;
-        if (!window.confirm(warning)) return;
-
         await deleteLead(lead.id);
         toast.success("Lead eliminado");
+        setDeleteTarget(null);
         router.refresh();
       } catch (error) {
         toast.error("No se pudo eliminar el lead", {
@@ -151,11 +163,15 @@ export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
                   <Button
                     size="icon-sm"
                     variant="ghost"
-                    disabled={isPending}
-                    onClick={() => handleDelete(lead)}
+                    disabled={checkingId === lead.id || isPending}
+                    onClick={() => handleDeleteClick(lead)}
                     title="Eliminar lead"
                   >
-                    <Trash2 className="size-3.5 text-destructive" />
+                    {checkingId === lead.id ? (
+                      <Loader2 className="size-3.5 animate-spin text-destructive" />
+                    ) : (
+                      <Trash2 className="size-3.5 text-destructive" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -163,6 +179,25 @@ export function LeadsBoardClient({ leads }: { leads: LeadRow[] }) {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="Eliminar lead"
+        description={
+          deleteTarget
+            ? deleteTarget.orderCount > 0
+              ? `¿Eliminar ${deleteTarget.lead.name || "este lead"}? Esto también borra ${deleteTarget.orderCount} pedido(s) suyo(s) con sus pagos — no se puede deshacer.`
+              : `¿Eliminar ${deleteTarget.lead.name || "este lead"}? Esta acción no se puede deshacer.`
+            : ""
+        }
+        confirmLabel="Eliminar"
+        variant="destructive"
+        loading={isPending}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

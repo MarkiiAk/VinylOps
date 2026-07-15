@@ -1,10 +1,11 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { updateOrderStatus } from "@/lib/actions/orders";
 
 interface CloseOrderButtonProps {
@@ -18,19 +19,16 @@ interface CloseOrderButtonProps {
  * consumo de inventario, eso ya pasó antes en Completado/Entregado.
  */
 export function CloseOrderButton({ orderId }: CloseOrderButtonProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function handleClose() {
-    const confirmed = window.confirm(
-      "¿Cerrar este pedido? Marca que ya quedó completamente liquidado y resuelto."
-    );
-    if (!confirmed) return;
-
     startTransition(async () => {
       try {
         await updateOrderStatus(orderId, "Cerrado");
         toast.success("Pedido cerrado");
+        setConfirmOpen(false);
         router.refresh();
       } catch (error) {
         toast.error("No se pudo cerrar el pedido", {
@@ -41,9 +39,27 @@ export function CloseOrderButton({ orderId }: CloseOrderButtonProps) {
   }
 
   return (
-    <Button type="button" variant="outline" size="sm" className="gap-1.5" disabled={isPending} onClick={handleClose}>
-      <Lock className="size-3.5" />
-      {isPending ? "Cerrando..." : "Cerrar pedido"}
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={isPending}
+        onClick={() => setConfirmOpen(true)}
+      >
+        {isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Lock className="size-3.5" />}
+        {isPending ? "Cerrando..." : "Cerrar pedido"}
+      </Button>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Cerrar pedido"
+        description="¿Cerrar este pedido? Marca que ya quedó completamente liquidado y resuelto."
+        confirmLabel="Cerrar pedido"
+        loading={isPending}
+        onConfirm={handleClose}
+      />
+    </>
   );
 }

@@ -95,19 +95,18 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
                     ) : null}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
-                    <OrderStatusSelect
-                      orderId={order.id}
-                      status={order.status}
-                      className="min-w-[7.5rem] flex-1"
-                    />
-                    <RegisterPaymentDialog orderId={order.id} />
-                    <DeleteOrderButton
-                      orderId={order.id}
-                      leadId={order.lead.id}
-                      interest={order.interest}
-                      stayOnPage
-                    />
+                  <div className="flex flex-col gap-2 border-t border-border pt-2">
+                    <OrderStatusSelect orderId={order.id} status={order.status} className="w-full" />
+                    <div className="flex items-center gap-2">
+                      <RegisterPaymentDialog orderId={order.id} />
+                      <DeleteOrderButton
+                        orderId={order.id}
+                        leadId={order.lead.id}
+                        interest={order.interest}
+                        stayOnPage
+                        className="ml-auto"
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
