@@ -8,6 +8,7 @@ import { LeadStatusBadge } from "@/components/lead-status-badge";
 import { OrderStatusBadge } from "@/components/order-status-badge";
 import { getLeadWithOrders } from "@/lib/actions/leads";
 import { LeadFormDialog } from "../_components/lead-form-dialog";
+import { DeleteOrderButton } from "../../pedidos/[id]/_components/delete-order-button";
 
 function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
@@ -103,23 +104,25 @@ export default async function LeadDetailPage({ params }: LeadDetailPageProps) {
             {lead.orders.map((order) => {
               const total = order.lineItems.reduce((sum, line) => sum + line.lineTotal, 0);
               return (
-                <Link
+                <div
                   key={order.id}
-                  href={`/pedidos/${order.id}`}
-                  className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-sidebar-accent/40"
+                  className="flex items-center gap-2 px-4 py-3 transition-colors hover:bg-sidebar-accent/40"
                 >
-                  <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="truncate text-sm font-medium text-foreground">{order.interest}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {formatDate(order.createdAt)}
-                      {order.deliveryDate ? ` · Entrega: ${formatDate(order.deliveryDate)}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="text-sm font-medium tabular-nums text-foreground">{formatMXN(total)}</span>
-                    <OrderStatusBadge status={order.status} />
-                  </div>
-                </Link>
+                  <Link href={`/pedidos/${order.id}`} className="flex min-w-0 flex-1 items-center justify-between gap-4">
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <p className="truncate text-sm font-medium text-foreground">{order.interest}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {formatDate(order.createdAt)}
+                        {order.deliveryDate ? ` · Entrega: ${formatDate(order.deliveryDate)}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span className="text-sm font-medium tabular-nums text-foreground">{formatMXN(total)}</span>
+                      <OrderStatusBadge status={order.status} />
+                    </div>
+                  </Link>
+                  <DeleteOrderButton orderId={order.id} leadId={lead.id} interest={order.interest} />
+                </div>
               );
             })}
           </div>

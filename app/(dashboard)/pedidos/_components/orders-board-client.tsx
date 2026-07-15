@@ -94,8 +94,12 @@ export function OrdersBoardClient({ orders }: { orders: OrderCardData[] }) {
                     ) : null}
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
-                    <OrderStatusSelect orderId={order.id} status={order.status} className="w-[9.5rem]" />
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border pt-2">
+                    <OrderStatusSelect
+                      orderId={order.id}
+                      status={order.status}
+                      className="min-w-[7.5rem] flex-1"
+                    />
                     <RegisterPaymentDialog orderId={order.id} />
                   </div>
                 </div>
