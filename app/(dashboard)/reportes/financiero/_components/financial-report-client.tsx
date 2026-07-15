@@ -1,19 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Download, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { computeFinancialReport, type ReportOrder } from "@/lib/financial-report";
-import type { DateRangePreset } from "@/lib/date-ranges";
 import { buildCsv, downloadCsv } from "@/lib/csv";
 
 interface OrderRow {
@@ -41,15 +31,6 @@ interface ExpenseRow {
   concept: string;
   method: string;
 }
-
-const RANGE_OPTIONS: { value: DateRangePreset | "personalizado"; label: string }[] = [
-  { value: "hoy", label: "Hoy" },
-  { value: "semana", label: "Esta semana" },
-  { value: "mes", label: "Este mes" },
-  { value: "mesAnterior", label: "Mes anterior" },
-  { value: "personalizado", label: "Rango personalizado" },
-  { value: "todos", label: "Todo" },
-];
 
 function formatMXN(value: number) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(value);
@@ -99,18 +80,9 @@ export function FinancialReportClient({
   purchases: PurchaseRow[];
   expenses: ExpenseRow[];
 }) {
-  const [rangeOption, setRangeOption] = useState<DateRangePreset | "personalizado">("mes");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-
-  const range = useMemo(() => {
-    if (rangeOption !== "personalizado") return rangeOption;
-    return {
-      from: customFrom ? new Date(`${customFrom}T00:00:00`) : null,
-      to: customTo ? new Date(`${customTo}T23:59:59`) : null,
-    };
-  }, [rangeOption, customFrom, customTo]);
-
+  // Simplificado a proposito (2026-07, feedback del dueño: "solo semanal, no
+  // me sirve cualquier otro periodo") — el reporte siempre es de esta
+  // semana, sin selector de periodo.
   const report = useMemo(() => {
     return computeFinancialReport({
       orders: orders.map((o) => ({
@@ -121,9 +93,9 @@ export function FinancialReportClient({
       })),
       purchases: purchases.map((p) => ({ id: p.id, finalPrice: p.finalPrice, purchaseDate: new Date(p.purchaseDate) })),
       expenses: expenses.map((e) => ({ id: e.id, amount: e.amount, category: e.category, date: new Date(e.date) })),
-      range,
+      range: "semana",
     });
-  }, [orders, purchases, expenses, range]);
+  }, [orders, purchases, expenses]);
 
   function exportPedidos() {
     const csv = buildCsv(
@@ -208,40 +180,6 @@ export function FinancialReportClient({
 
   return (
     <div className="space-y-4">
-      <div className="glass-panel flex flex-wrap items-end gap-3 rounded-xl p-4">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Periodo</Label>
-          <Select
-            value={rangeOption}
-            items={RANGE_OPTIONS}
-            onValueChange={(v) => setRangeOption((v as DateRangePreset | "personalizado") ?? "mes")}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RANGE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {rangeOption === "personalizado" ? (
-          <>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Desde</Label>
-              <Input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Hasta</Label>
-              <Input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-            </div>
-          </>
-        ) : null}
-      </div>
-
       <div className="glass-panel flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/5 p-3 text-xs text-muted-foreground">
         <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-warning" />
         <p>

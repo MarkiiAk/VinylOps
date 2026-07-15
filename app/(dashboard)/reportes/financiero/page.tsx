@@ -16,7 +16,7 @@ export default async function FinancialReportPage() {
     <div className="space-y-6">
       <SectionHeading
         title="Reporte financiero"
-        subtitle="Ventas, cobranza, costos de producción, rentabilidad, gastos y resultado — por periodo."
+        subtitle="Ventas, cobranza, costos de producción, rentabilidad, gastos y resultado — de esta semana."
       />
 
       <FinancialReportClient
